@@ -130,3 +130,71 @@ test('rename rewrites imported component declarations and cross-package usages',
   assert.ok(allEdits.some(({ uri }) => /examples\/webserver\/pages\.gsx$/.test(uri)));
   assert.ok(allEdits.every(({ entry }) => entry.newText === 'Surface'));
 });
+
+test('go to definition resolves local and imported slot names', async () => {
+  const localDocument = documentFor('examples/layouts/pages.gsx');
+  const localText = localDocument.getText();
+  const localOffset = offsetFor(localText, 'slot="head"', 1, 'slot="'.length);
+  const localLinks = await provideDefinition(localDocument, localDocument.positionAt(localOffset));
+  assert.ok(localLinks);
+  assert.equal(localLinks.length, 1);
+  assert.equal(localLinks[0].targetUri, localDocument.uri);
+  assert.equal(localLinks[0].targetSelectionRange.start.line, 26);
+
+  const importedDocument = documentFor('examples/crosspkg/pages.gsx');
+  const importedText = importedDocument.getText();
+  const importedOffset = offsetFor(importedText, 'slot="head"', 1, 'slot="'.length);
+  const importedLinks = await provideDefinition(importedDocument, importedDocument.positionAt(importedOffset));
+  assert.ok(importedLinks);
+  assert.equal(importedLinks.length, 1);
+  assert.match(importedLinks[0].targetUri, /examples\/shared\/layouts\/layouts\.gsx$/);
+  assert.equal(importedLinks[0].targetSelectionRange.start.line, 24);
+});
+
+test('find references returns slot declarations and usages scoped to the owning component', async () => {
+  const localDocument = documentFor('examples/layouts/pages.gsx');
+  const localText = localDocument.getText();
+  const localOffset = offsetFor(localText, 'slot="head"', 1, 'slot="'.length);
+  const localRefs = await provideReferences(localDocument, localDocument.positionAt(localOffset), true);
+  assert.ok(localRefs);
+  assert.equal(localRefs.length, 2);
+  assert.ok(localRefs.every((ref) => ref.uri === localDocument.uri));
+
+  const importedDocument = documentFor('examples/crosspkg/pages.gsx');
+  const importedText = importedDocument.getText();
+  const importedOffset = offsetFor(importedText, 'slot="head"', 1, 'slot="'.length);
+  const importedRefs = await provideReferences(importedDocument, importedDocument.positionAt(importedOffset), true);
+  assert.ok(importedRefs);
+  assert.equal(importedRefs.length, 4);
+  const importedUris = importedRefs.map((ref) => ref.uri).join('\n');
+  assert.match(importedUris, /examples\/shared\/layouts\/layouts\.gsx/);
+  assert.match(importedUris, /examples\/crosspkg\/pages\.gsx/);
+  assert.match(importedUris, /examples\/webserver\/pages\.gsx/);
+});
+
+test('rename rewrites local and imported slot declarations and usages', async () => {
+  const localDocument = documentFor('examples/layouts/pages.gsx');
+  const localText = localDocument.getText();
+  const localPosition = localDocument.positionAt(offsetFor(localText, 'slot="head"', 1, 'slot="'.length));
+  const localPrepare = await prepareComponentRename(localDocument, localPosition);
+  assert.ok(localPrepare);
+  const localEdit = await provideRenameEdits(localDocument, localPosition, 'meta');
+  assert.ok(localEdit);
+  assert.equal(localEdit.changes[localDocument.uri].length, 2);
+  assert.ok(localEdit.changes[localDocument.uri].every((entry) => entry.newText === 'meta'));
+
+  const importedDocument = documentFor('examples/crosspkg/pages.gsx');
+  const importedText = importedDocument.getText();
+  const importedPosition = importedDocument.positionAt(offsetFor(importedText, 'slot="head"', 1, 'slot="'.length));
+  const importedEdit = await provideRenameEdits(importedDocument, importedPosition, 'meta');
+  assert.ok(importedEdit);
+  assert.equal(Object.keys(importedEdit.changes).length, 3);
+  const importedChanges = Object.entries(importedEdit.changes).flatMap(([uri, edits]) => edits.map((entry) => ({ uri, entry })));
+  assert.ok(importedChanges.some(({ uri }) => /examples\/shared\/layouts\/layouts\.gsx$/.test(uri)));
+  assert.ok(importedChanges.some(({ uri }) => /examples\/crosspkg\/pages\.gsx$/.test(uri)));
+  assert.ok(importedChanges.some(({ uri }) => /examples\/webserver\/pages\.gsx$/.test(uri)));
+  assert.ok(importedChanges.every(({ entry }) => entry.newText === 'meta'));
+
+  const invalid = await provideRenameEdits(importedDocument, importedPosition, 'bad name');
+  assert.equal(invalid, null);
+});

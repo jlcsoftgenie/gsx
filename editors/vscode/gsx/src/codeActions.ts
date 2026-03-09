@@ -16,6 +16,13 @@ export function provideCodeActions(
   for (const diagnostic of diagnostics) {
     const code = typeof diagnostic.code === 'string' ? diagnostic.code : '';
     switch (code) {
+      case 'L009': {
+        const edit = ensureAnchorRelNoopener(document, diagnostic.range.start);
+        if (edit !== undefined) {
+          actions.push(quickFix(document, diagnostic, 'Ensure rel="noopener noreferrer" on <a>', edit));
+        }
+        break;
+      }
       case 'L001': {
         const edit = insertAttributeIntoTag(document, diagnostic.range.start, 'img', 'alt', ' alt=""');
         if (edit !== undefined) {
@@ -125,6 +132,48 @@ function addExplicitBooleanAttributeValue(
     return undefined;
   }
   return TextEdit.insert(document.positionAt(end), '="true"');
+}
+
+function ensureAnchorRelNoopener(
+  document: TextDocument,
+  start: Range['start']
+): TextEdit | undefined {
+  const text = document.getText();
+  const tagStart = elementStartOffset(text, document.offsetAt(start));
+  if (tagStart === undefined) {
+    return undefined;
+  }
+  if (!text.slice(tagStart).startsWith('<a')) {
+    return undefined;
+  }
+  const tagEnd = findTagCloseOffset(text, tagStart);
+  if (tagEnd === undefined) {
+    return undefined;
+  }
+  const tagText = text.slice(tagStart, tagEnd + 1);
+  const relMatch = /\brel\s*=\s*(?:"([^"]*)"|'([^']*)')/.exec(tagText);
+  if (relMatch === null) {
+    const insertOffset = insertionOffsetBeforeTagClose(text, tagEnd);
+    return TextEdit.insert(document.positionAt(insertOffset), ' rel="noopener noreferrer"');
+  }
+  const currentValue = relMatch[1] ?? relMatch[2] ?? '';
+  const tokens = currentValue.split(/\s+/).filter(Boolean);
+  if (!tokens.includes('noopener')) {
+    tokens.push('noopener');
+  }
+  if (!tokens.includes('noreferrer')) {
+    tokens.push('noreferrer');
+  }
+  const valueIndex = relMatch[1] !== undefined ? 1 : 2;
+  const valueStart = tagStart + (relMatch.index ?? 0) + relMatch[0].indexOf(relMatch[valueIndex]);
+  const valueEnd = valueStart + currentValue.length
+  return TextEdit.replace(
+    {
+      start: document.positionAt(valueStart),
+      end: document.positionAt(valueEnd)
+    },
+    tokens.join(' ')
+  );
 }
 
 function elementStartOffset(text: string, offset: number): number | undefined {

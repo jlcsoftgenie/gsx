@@ -71,3 +71,32 @@ test('code actions can offer a format fix and aria boolean fix', () => {
   assert.equal(actions[1].title, 'Set ARIA attribute to "true"');
   assert.equal(actions[1].edit.changes[document.uri][0].newText, '="true"');
 });
+
+test('code actions can add or extend rel on target blank anchors', () => {
+  const document = inlineDocument('<a href="/docs" target="_blank">Docs</a>\n<a href="/docs" target="_blank" rel="nofollow">Docs</a>\n');
+  const actions = provideCodeActions(document, [
+    {
+      code: 'L009',
+      message: 'anchor with target="_blank" should include rel="noopener noreferrer"',
+      severity: DiagnosticSeverity.Warning,
+      range: {
+        start: { line: 0, character: 0 },
+        end: { line: 0, character: 1 }
+      }
+    },
+    {
+      code: 'L009',
+      message: 'anchor with target="_blank" should include rel="noopener noreferrer"',
+      severity: DiagnosticSeverity.Warning,
+      range: {
+        start: { line: 1, character: 0 },
+        end: { line: 1, character: 1 }
+      }
+    }
+  ]);
+
+  assert.equal(actions.length, 2);
+  assert.equal(actions[0].title, 'Ensure rel="noopener noreferrer" on <a>');
+  assert.equal(actions[0].edit.changes[document.uri][0].newText, ' rel="noopener noreferrer"');
+  assert.equal(actions[1].edit.changes[document.uri][0].newText, 'nofollow noopener noreferrer');
+});

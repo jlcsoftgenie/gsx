@@ -149,12 +149,39 @@ interface TagAttributeOccurrence {
   startOffset: number;
   endOffset: number;
   spanEndOffset: number;
+  value?: string;
+  valueRange?: {
+    startOffset: number;
+    endOffset: number;
+  };
 }
 
 interface ComponentTarget {
   importPath: string;
   name: string;
   originRange: Range;
+}
+
+interface SlotTarget {
+  componentImportPath: string;
+  componentName: string;
+  slotName: string;
+  originRange: Range;
+}
+
+interface SlotOccurrence {
+  componentImportPath: string;
+  componentName: string;
+  slotName: string;
+  range: Range;
+  isDeclaration: boolean;
+}
+
+interface TagFrame {
+  tagName: string;
+  isComponent: boolean;
+  componentImportPath?: string;
+  componentName?: string;
 }
 
 interface GSXFileSnapshot {
@@ -364,6 +391,19 @@ export async function provideDefinition(
   document: TextDocument,
   position: Position
 ): Promise<LocationLink[] | null> {
+  const slot = await resolveSlotTarget(document, position);
+  if (slot !== undefined) {
+    const declarations = await slotDeclarationOccurrences(document.uri, slot);
+    if (declarations.length === 0) {
+      return null;
+    }
+    return declarations.map((occurrence) => ({
+      targetUri: occurrence.document.uri,
+      targetRange: occurrence.range,
+      targetSelectionRange: occurrence.range,
+      originSelectionRange: slot.originRange
+    }));
+  }
   const tag = componentTagNameContext(document, position);
   if (tag === undefined || !isComponentReference(tag.tagName)) {
     return null;
@@ -423,6 +463,16 @@ export async function provideReferences(
   position: Position,
   includeDeclaration: boolean
 ): Promise<Location[] | null> {
+  const slotTarget = await resolveSlotTarget(document, position);
+  if (slotTarget !== undefined) {
+    const occurrences = await slotOccurrences(document.uri, slotTarget);
+    return occurrences
+      .filter((occurrence) => includeDeclaration || !occurrence.isDeclaration)
+      .map((occurrence) => ({
+        uri: occurrence.document.uri,
+        range: occurrence.range
+      }));
+  }
   const target = await resolveComponentTarget(document, position);
   if (target === undefined) {
     return null;
@@ -440,6 +490,10 @@ export async function prepareComponentRename(
   document: TextDocument,
   position: Position
 ): Promise<Range | null> {
+  const slotTarget = await resolveSlotTarget(document, position);
+  if (slotTarget !== undefined) {
+    return slotTarget.originRange;
+  }
   const target = await resolveComponentTarget(document, position);
   return target?.originRange ?? null;
 }
@@ -449,6 +503,20 @@ export async function provideRenameEdits(
   position: Position,
   newName: string
 ): Promise<WorkspaceEdit | null> {
+  const slotTarget = await resolveSlotTarget(document, position);
+  if (slotTarget !== undefined) {
+    if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(newName)) {
+      return null;
+    }
+    const occurrences = await slotOccurrences(document.uri, slotTarget);
+    const changes: Record<string, TextEdit[]> = {};
+    for (const occurrence of occurrences) {
+      const edits = changes[occurrence.document.uri] ?? [];
+      edits.push(TextEdit.replace(occurrence.range, newName));
+      changes[occurrence.document.uri] = edits;
+    }
+    return { changes };
+  }
   if (!/^[A-Z][A-Za-z0-9_]*$/.test(newName)) {
     return null;
   }
@@ -1232,7 +1300,15 @@ function parseTagAttributes(tail: string, baseOffset: number): TagAttributeOccur
       break;
     }
     if (tail[index] === '"' || tail[index] === '\'') {
-      index = skipQuotedValue(tail, index);
+      const quote = tail[index];
+      const valueStart = index + 1;
+      const valueEnd = findQuotedValueEnd(tail, index);
+      occurrence.value = tail.slice(valueStart, valueEnd);
+      occurrence.valueRange = {
+        startOffset: baseOffset + valueStart,
+        endOffset: baseOffset + valueEnd
+      };
+      index = valueEnd < tail.length && tail[valueEnd] === quote ? valueEnd + 1 : valueEnd;
     } else if (tail[index] === '{') {
       index = skipBracedValue(tail, index);
     } else {
@@ -1246,6 +1322,84 @@ function parseTagAttributes(tail: string, baseOffset: number): TagAttributeOccur
   return attrs;
 }
 
+function parseOpenTag(
+  text: string,
+  startOffset: number
+): { tagName: string; attrs: TagAttributeOccurrence[]; selfClosing: boolean; nextOffset: number } | undefined {
+  const probe = text.slice(startOffset, Math.min(text.length, startOffset + 512));
+  const match = /^<([A-Za-z_][A-Za-z0-9_.:-]*)/.exec(probe);
+  if (match === null) {
+    return undefined;
+  }
+  const tagName = match[1];
+  const tagCloseOffset = findTagCloseOffset(text, startOffset);
+  if (tagCloseOffset === undefined) {
+    return undefined;
+  }
+  const attrsStart = startOffset + 1 + tagName.length;
+  const attrsEnd = trailingTagSlashOffset(text, attrsStart, tagCloseOffset);
+  const attrs = parseTagAttributes(text.slice(attrsStart, attrsEnd), attrsStart);
+  return {
+    tagName,
+    attrs,
+    selfClosing: trailingNonSpaceOffset(text, tagCloseOffset - 1) >= 0 && text[trailingNonSpaceOffset(text, tagCloseOffset - 1)] === '/',
+    nextOffset: tagCloseOffset + 1
+  };
+}
+
+function findTagCloseOffset(text: string, startOffset: number): number | undefined {
+  let braceDepth = 0;
+  let quote: '"' | '\'' | '`' | undefined;
+  for (let index = startOffset; index < text.length; index++) {
+    const ch = text[index];
+    if (quote !== undefined) {
+      if (quote !== '`' && ch === '\\') {
+        index++;
+        continue;
+      }
+      if (ch === quote) {
+        quote = undefined;
+      }
+      continue;
+    }
+    if (ch === '"' || ch === '\'' || ch === '`') {
+      quote = ch;
+      continue;
+    }
+    if (ch === '{') {
+      braceDepth++;
+      continue;
+    }
+    if (ch === '}') {
+      braceDepth = Math.max(0, braceDepth - 1);
+      continue;
+    }
+    if (ch === '>' && braceDepth === 0) {
+      return index;
+    }
+  }
+  return undefined;
+}
+
+function parseClosingTag(
+  text: string,
+  startOffset: number
+): { tagName: string; nextOffset: number } | undefined {
+  const probe = text.slice(startOffset, Math.min(text.length, startOffset + 256));
+  const match = /^<\/([A-Za-z_][A-Za-z0-9_.:-]*)/.exec(probe);
+  if (match === null) {
+    return undefined;
+  }
+  const tagCloseOffset = findTagCloseOffset(text, startOffset);
+  if (tagCloseOffset === undefined) {
+    return undefined;
+  }
+  return {
+    tagName: match[1],
+    nextOffset: tagCloseOffset + 1
+  };
+}
+
 function skipSpaces(text: string, index: number): number {
   while (index < text.length && /\s/.test(text[index])) {
     index++;
@@ -1254,19 +1408,11 @@ function skipSpaces(text: string, index: number): number {
 }
 
 function skipQuotedValue(text: string, index: number): number {
-  const quote = text[index];
-  index++;
-  while (index < text.length) {
-    if (text[index] === '\\') {
-      index += 2;
-      continue;
-    }
-    if (text[index] === quote) {
-      return index + 1;
-    }
-    index++;
+  const end = findQuotedValueEnd(text, index);
+  if (end < text.length && text[end] === text[index]) {
+    return end + 1;
   }
-  return index;
+  return end;
 }
 
 function skipBracedValue(text: string, index: number): number {
@@ -1288,6 +1434,70 @@ function skipBracedValue(text: string, index: number): number {
     index++;
   }
   return index;
+}
+
+function findQuotedValueEnd(text: string, index: number): number {
+  const quote = text[index];
+  index++;
+  while (index < text.length) {
+    if (text[index] === '\\') {
+      index += 2;
+      continue;
+    }
+    if (text[index] === quote) {
+      return index;
+    }
+    index++;
+  }
+  return index;
+}
+
+function trailingNonSpaceOffset(text: string, index: number): number {
+  while (index >= 0 && /\s/.test(text[index])) {
+    index--;
+  }
+  return index;
+}
+
+function trailingTagSlashOffset(text: string, attrsStart: number, tagCloseOffset: number): number {
+  const candidate = trailingNonSpaceOffset(text, tagCloseOffset - 1);
+  if (candidate >= attrsStart && text[candidate] === '/') {
+    return candidate;
+  }
+  return tagCloseOffset;
+}
+
+function popTagFrame(stack: TagFrame[], tagName: string): void {
+  for (let index = stack.length - 1; index >= 0; index--) {
+    if (stack[index].tagName === tagName) {
+      stack.splice(index, 1);
+      return;
+    }
+  }
+}
+
+function resolveTagFrame(snapshot: GSXFileSnapshot, tagName: string): TagFrame {
+  if (!isComponentReference(tagName)) {
+    return { tagName, isComponent: false };
+  }
+  if (tagName.includes('.')) {
+    const [alias, componentName] = tagName.split('.', 2);
+    const importPath = snapshot.imports.get(alias);
+    if (importPath !== undefined) {
+      return {
+        tagName,
+        isComponent: true,
+        componentImportPath: importPath,
+        componentName
+      };
+    }
+  }
+  return {
+    tagName,
+    isComponent: true,
+    componentImportPath: snapshot.importPath,
+    componentName: tagName
+  };
 }
 
 async function importedComponentDefinition(uri: string, text: string, fullToken: string): Promise<ComponentDefinition | undefined> {
@@ -1355,6 +1565,153 @@ async function componentOccurrences(
           isDeclaration: false
         });
       }
+    }
+  }
+  return occurrences;
+}
+
+async function resolveSlotTarget(
+  document: TextDocument,
+  position: Position
+): Promise<SlotTarget | undefined> {
+  const importPath = await packageImportPathForURI(document.uri);
+  if (importPath === undefined) {
+    return undefined;
+  }
+  const snapshot: GSXFileSnapshot = {
+    document,
+    importPath,
+    imports: parseImports(document.getText()),
+    definitions: parseComponentDefinitions(document.getText(), document.uri)
+  };
+  const offset = document.offsetAt(position);
+  for (const occurrence of slotOccurrencesInSnapshot(snapshot)) {
+    const start = document.offsetAt(occurrence.range.start);
+    const end = document.offsetAt(occurrence.range.end);
+    if (offset < start || offset > end) {
+      continue;
+    }
+    return {
+      componentImportPath: occurrence.componentImportPath,
+      componentName: occurrence.componentName,
+      slotName: occurrence.slotName,
+      originRange: occurrence.range
+    };
+  }
+  return undefined;
+}
+
+async function slotDeclarationOccurrences(
+  uri: string,
+  target: SlotTarget
+): Promise<Array<{ document: TextDocument; range: Range }>> {
+  const snapshots = await scanModuleGSXFiles(uri);
+  const occurrences: Array<{ document: TextDocument; range: Range }> = [];
+  for (const snapshot of snapshots) {
+    for (const occurrence of slotOccurrencesInSnapshot(snapshot)) {
+      if (
+        occurrence.isDeclaration &&
+        occurrence.componentImportPath === target.componentImportPath &&
+        occurrence.componentName === target.componentName &&
+        occurrence.slotName === target.slotName
+      ) {
+        occurrences.push({ document: snapshot.document, range: occurrence.range });
+      }
+    }
+  }
+  return occurrences;
+}
+
+async function slotOccurrences(
+  uri: string,
+  target: SlotTarget
+): Promise<Array<{ document: TextDocument; range: Range; isDeclaration: boolean }>> {
+  const snapshots = await scanModuleGSXFiles(uri);
+  const occurrences: Array<{ document: TextDocument; range: Range; isDeclaration: boolean }> = [];
+  for (const snapshot of snapshots) {
+    for (const occurrence of slotOccurrencesInSnapshot(snapshot)) {
+      if (
+        occurrence.componentImportPath === target.componentImportPath &&
+        occurrence.componentName === target.componentName &&
+        occurrence.slotName === target.slotName
+      ) {
+        occurrences.push({
+          document: snapshot.document,
+          range: occurrence.range,
+          isDeclaration: occurrence.isDeclaration
+        });
+      }
+    }
+  }
+  return occurrences;
+}
+
+function slotOccurrencesInSnapshot(snapshot: GSXFileSnapshot): SlotOccurrence[] {
+  const text = snapshot.document.getText();
+  const definitions = [...snapshot.definitions.values()].sort((a, b) => a.startLine - b.startLine);
+  const occurrences: SlotOccurrence[] = [];
+  for (const definition of definitions) {
+    const startOffset = snapshot.document.offsetAt({ line: definition.startLine, character: 0 });
+    const endOffset = snapshot.document.offsetAt({ line: definition.endLine, character: definition.endCharacter });
+    const stack: TagFrame[] = [];
+    let index = startOffset;
+    while (index < endOffset) {
+      if (text.startsWith('<!--', index)) {
+        const commentEnd = text.indexOf('-->', index + 4);
+        index = commentEnd >= 0 ? commentEnd + 3 : endOffset;
+        continue;
+      }
+      if (text[index] !== '<') {
+        index++;
+        continue;
+      }
+      if (text.startsWith('</', index)) {
+        const close = parseClosingTag(text, index);
+        if (close === undefined) {
+          index++;
+          continue;
+        }
+        popTagFrame(stack, close.tagName);
+        index = close.nextOffset;
+        continue;
+      }
+      if (text.startsWith('<!', index)) {
+        const end = findTagCloseOffset(text, index);
+        index = end === undefined ? endOffset : end + 1;
+        continue;
+      }
+      const tag = parseOpenTag(text, index);
+      if (tag === undefined) {
+        index++;
+        continue;
+      }
+      if (tag.tagName === 'slot') {
+        const nameAttr = tag.attrs.find((attr) => attr.name === 'name' && attr.value !== undefined && attr.valueRange !== undefined);
+        if (nameAttr?.value !== undefined && nameAttr.valueRange !== undefined) {
+          occurrences.push({
+            componentImportPath: snapshot.importPath,
+            componentName: definition.name,
+            slotName: nameAttr.value,
+            range: offsetRange(snapshot.document, nameAttr.valueRange.startOffset, nameAttr.valueRange.endOffset),
+            isDeclaration: true
+          });
+        }
+      }
+      const slotAttr = tag.attrs.find((attr) => attr.name === 'slot' && attr.value !== undefined && attr.valueRange !== undefined);
+      const parent = stack[stack.length - 1];
+      if (slotAttr?.value !== undefined && slotAttr.valueRange !== undefined && parent?.isComponent) {
+        occurrences.push({
+          componentImportPath: parent.componentImportPath ?? snapshot.importPath,
+          componentName: parent.componentName ?? parent.tagName,
+          slotName: slotAttr.value,
+          range: offsetRange(snapshot.document, slotAttr.valueRange.startOffset, slotAttr.valueRange.endOffset),
+          isDeclaration: false
+        });
+      }
+      if (!tag.selfClosing) {
+        stack.push(resolveTagFrame(snapshot, tag.tagName));
+      }
+      index = tag.nextOffset;
     }
   }
   return occurrences;

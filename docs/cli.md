@@ -46,6 +46,17 @@ Runs template lint rules without writing output.
 gsx lint .
 ```
 
+Current built-in rules include checks for:
+- missing `img` alt text
+- missing `button` type
+- suspicious raw HTML usage
+- invalid block content inside `<p>`
+- unused child content passed to components that do not render slots
+- boolean `aria-*` attributes without explicit values
+- `target="_blank"` anchors missing `rel="noopener noreferrer"`
+- form controls without an associated label or ARIA label
+- `label for="..."` references that do not match any local `id`
+
 ### `gsx fmt`
 
 Formats `.gsx` files deterministically.

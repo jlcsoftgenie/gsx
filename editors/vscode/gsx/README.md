@@ -41,6 +41,7 @@ Features:
 - rename support for GSX component declarations and usages within the current module
 - signature help for component props while typing inside component tags
 - code actions / quick fixes for common GSX diagnostics like missing `alt`, missing `button type`, ARIA boolean values, and formatting drift
+  plus `target="_blank"` anchors missing `rel="noopener noreferrer"`
 - optional `gopls`-backed hover and completion inside single-line `{...}` Go expression regions
 - document formatting through the `gsx fmt` CLI
 - diagnostics through the `gsx check` CLI
