@@ -1,0 +1,10 @@
+.DS_Store
+.idea/
+.vscode-test/
+*.out
+*.test
+coverage.txt
+
+editors/vscode/gsx/node_modules/
+editors/vscode/gsx/dist/
+editors/vscode/gsx/*.vsix

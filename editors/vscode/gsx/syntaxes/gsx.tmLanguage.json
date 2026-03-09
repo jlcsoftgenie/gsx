@@ -1,0 +1,290 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "GSX",
+  "scopeName": "source.gsx",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#doctype" },
+    { "include": "#declarations" },
+    { "include": "#componentDeclaration" },
+    { "include": "#controlFlow" },
+    { "include": "#blockBraces" },
+    { "include": "#componentTag" },
+    { "include": "#htmlTag" },
+    { "include": "#expression" },
+    { "include": "#strings" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.block.html.gsx",
+          "begin": "<!--",
+          "end": "-->"
+        },
+        {
+          "name": "comment.line.double-slash.gsx",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.gsx",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "doctype": {
+      "patterns": [
+        {
+          "name": "meta.doctype.gsx",
+          "match": "<![Dd][Oo][Cc][Tt][Yy][Pp][Ee]\\s+html>"
+        }
+      ]
+    },
+    "declarations": {
+      "patterns": [
+        {
+          "name": "meta.package.gsx",
+          "match": "\\b(package)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.control.gsx" },
+            "2": { "name": "entity.name.namespace.gsx" }
+          }
+        },
+        {
+          "name": "meta.import.gsx",
+          "match": "\\b(import)\\b",
+          "captures": {
+            "1": { "name": "keyword.control.gsx" }
+          }
+        }
+      ]
+    },
+    "componentDeclaration": {
+      "patterns": [
+        {
+          "name": "meta.component.signature.gsx",
+          "begin": "\\b(component)\\s+([A-Z][A-Za-z0-9_]*)\\s*(\\()",
+          "beginCaptures": {
+            "1": { "name": "keyword.control.gsx" },
+            "2": { "name": "entity.name.function.gsx" },
+            "3": { "name": "punctuation.section.parameters.begin.gsx" }
+          },
+          "end": "(\\))(\\s*)(\\{)",
+          "endCaptures": {
+            "1": { "name": "punctuation.section.parameters.end.gsx" },
+            "3": { "name": "punctuation.section.block.begin.gsx" }
+          },
+          "patterns": [
+            { "include": "#goishCommon" }
+          ]
+        }
+      ]
+    },
+    "controlFlow": {
+      "patterns": [
+        {
+          "name": "meta.control.elseif.gsx",
+          "begin": "\\b(else)\\s+(if)\\b",
+          "beginCaptures": {
+            "1": { "name": "keyword.control.gsx" },
+            "2": { "name": "keyword.control.gsx" }
+          },
+          "end": "(\\{)",
+          "endCaptures": {
+            "1": { "name": "punctuation.section.block.begin.gsx" }
+          },
+          "patterns": [
+            { "include": "#goishCommon" }
+          ]
+        },
+        {
+          "name": "meta.control.flow.gsx",
+          "begin": "\\b(if|for)\\b",
+          "beginCaptures": {
+            "1": { "name": "keyword.control.gsx" }
+          },
+          "end": "(\\{)",
+          "endCaptures": {
+            "1": { "name": "punctuation.section.block.begin.gsx" }
+          },
+          "patterns": [
+            { "include": "#goishCommon" }
+          ]
+        },
+        {
+          "name": "meta.control.else.gsx",
+          "match": "\\b(else)\\b(\\s*)(\\{)",
+          "captures": {
+            "1": { "name": "keyword.control.gsx" },
+            "3": { "name": "punctuation.section.block.begin.gsx" }
+          }
+        }
+      ]
+    },
+    "blockBraces": {
+      "patterns": [
+        {
+          "name": "punctuation.section.block.end.gsx",
+          "match": "^\\s*(\\})\\s*$",
+          "captures": {
+            "1": { "name": "punctuation.section.block.end.gsx" }
+          }
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.gsx",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.gsx",
+              "match": "\\\\."
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.raw.gsx",
+          "begin": "`",
+          "end": "`"
+        }
+      ]
+    },
+    "expression": {
+      "patterns": [
+        {
+          "name": "meta.expression.gsx",
+          "begin": "\\{",
+          "beginCaptures": {
+            "0": { "name": "punctuation.section.embedded.begin.gsx" }
+          },
+          "end": "\\}",
+          "endCaptures": {
+            "0": { "name": "punctuation.section.embedded.end.gsx" }
+          },
+          "patterns": [
+            { "include": "#goishCommon" }
+          ]
+        }
+      ]
+    },
+    "goishCommon": {
+      "patterns": [
+        { "include": "#strings" },
+        { "include": "#comments" },
+        {
+          "name": "keyword.control.goish.gsx",
+          "match": "\\b(func|if|else|for|range|return|switch|case|default|var|const|type|map|struct|chan|interface|break|continue|fallthrough|select|go|defer)\\b"
+        },
+        {
+          "name": "storage.type.goish.gsx",
+          "match": "\\b(any|bool|byte|complex64|complex128|error|float32|float64|int|int8|int16|int32|int64|rune|string|uint|uint8|uint16|uint32|uint64|uintptr)\\b"
+        },
+        {
+          "name": "constant.language.boolean.gsx",
+          "match": "\\b(true|false|nil)\\b"
+        },
+        {
+          "name": "constant.numeric.gsx",
+          "match": "\\b(?:0x[0-9A-Fa-f]+|\\d+(?:\\.\\d+)?)\\b"
+        },
+        {
+          "name": "keyword.operator.gsx",
+          "match": ":=|==|!=|<=|>=|&&|\\|\\||<-|\\.\\.\\.|[=+\\-*/%<>!&|^:,]"
+        },
+        {
+          "name": "punctuation.section.group.begin.gsx",
+          "match": "[\\[(]"
+        },
+        {
+          "name": "punctuation.section.group.end.gsx",
+          "match": "[\\])]"
+        },
+        {
+          "name": "variable.language.blank.gsx",
+          "match": "\\b_\\b"
+        },
+        {
+          "name": "punctuation.accessor.gsx",
+          "match": "\\."
+        },
+        {
+          "name": "variable.other.property.gsx",
+          "match": "(?<=\\.)[A-Za-z_][A-Za-z0-9_]*\\b"
+        },
+        {
+          "name": "support.function.gsx",
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()"
+        },
+        {
+          "name": "support.type.goish.gsx",
+          "match": "\\b[A-Z][A-Za-z0-9_]*\\b"
+        },
+        {
+          "name": "variable.other.gsx",
+          "match": "\\b[a-z_][A-Za-z0-9_]*\\b"
+        }
+      ]
+    },
+    "componentTag": {
+      "patterns": [
+        {
+          "name": "meta.tag.component.gsx",
+          "begin": "(<\\/?)((?:[A-Z][A-Za-z0-9_]*|[a-z_][A-Za-z0-9_]*\\.[A-Z][A-Za-z0-9_]*))",
+          "beginCaptures": {
+            "1": { "name": "punctuation.definition.tag.begin.gsx" },
+            "2": { "name": "entity.name.tag.component.gsx" }
+          },
+          "end": "(\\/?>)",
+          "endCaptures": {
+            "1": { "name": "punctuation.definition.tag.end.gsx" }
+          },
+          "patterns": [
+            { "include": "#tagAttributes" },
+            { "include": "#expression" }
+          ]
+        }
+      ]
+    },
+    "htmlTag": {
+      "patterns": [
+        {
+          "name": "meta.tag.html.gsx",
+          "begin": "(<\\/?)([a-z][A-Za-z0-9:_-]*|fragment|slot|raw)",
+          "beginCaptures": {
+            "1": { "name": "punctuation.definition.tag.begin.gsx" },
+            "2": { "name": "entity.name.tag.gsx" }
+          },
+          "end": "(\\/?>)",
+          "endCaptures": {
+            "1": { "name": "punctuation.definition.tag.end.gsx" }
+          },
+          "patterns": [
+            { "include": "#tagAttributes" },
+            { "include": "#expression" }
+          ]
+        }
+      ]
+    },
+    "tagAttributes": {
+      "patterns": [
+        {
+          "name": "meta.attribute.gsx",
+          "match": "([A-Za-z_:][A-Za-z0-9:._-]*)(\\s*=)",
+          "captures": {
+            "1": { "name": "entity.other.attribute-name.gsx" },
+            "2": { "name": "keyword.operator.assignment.gsx" }
+          }
+        },
+        {
+          "name": "entity.other.attribute-name.gsx",
+          "match": "(?<=\\s)([A-Za-z_:][A-Za-z0-9:._-]*)(?=\\s|\\/?>)"
+        },
+        { "include": "#strings" }
+      ]
+    }
+  }
+}

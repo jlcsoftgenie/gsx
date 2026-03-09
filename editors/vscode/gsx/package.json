@@ -1,0 +1,126 @@
+{
+  "name": "gsx-language-tools",
+  "displayName": "GSX Language Tools",
+  "description": "Syntax highlighting, snippets, hover, formatting, diagnostics, and language-server completions for GSX templates.",
+  "version": "0.2.7",
+  "publisher": "jlcsoftgenie",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jlcsoftgenie/gsx.git"
+  },
+  "homepage": "https://github.com/jlcsoftgenie/gsx/tree/main/editors/vscode/gsx",
+  "bugs": {
+    "url": "https://github.com/jlcsoftgenie/gsx/issues"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Snippets",
+    "Formatters",
+    "Linters"
+  ],
+  "activationEvents": [
+    "onLanguage:gsx",
+    "onCommand:gsx.formatDocument",
+    "onCommand:gsx.runCheck"
+  ],
+  "main": "./dist/client.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "gsx",
+        "aliases": [
+          "GSX",
+          "gsx"
+        ],
+        "extensions": [
+          ".gsx"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "gsx",
+        "scopeName": "source.gsx",
+        "path": "./syntaxes/gsx.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "gsx",
+        "path": "./snippets/gsx.code-snippets"
+      }
+    ],
+    "commands": [
+      {
+        "command": "gsx.formatDocument",
+        "title": "GSX: Format Document"
+      },
+      {
+        "command": "gsx.runCheck",
+        "title": "GSX: Run Check"
+      }
+    ],
+    "configuration": {
+      "title": "GSX",
+      "properties": {
+        "gsx.command": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Executable used to run GSX CLI operations. Leave empty to auto-detect the local workspace CLI first and then fall back to `gsx` on PATH. Example explicit values: `gsx` or `go`."
+        },
+        "gsx.commandArgs": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "markdownDescription": "Extra arguments passed before the GSX subcommand when `gsx.command` is set. Example: `[\"run\", \"./cmd/gsx\"]`."
+        },
+        "gsx.checkOnOpen": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Run `gsx check` diagnostics when a GSX document is opened."
+        },
+        "gsx.checkOnSave": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Run `gsx check` diagnostics when a GSX document is saved."
+        },
+        "gsx.diagnosticDebounceMs": {
+          "type": "number",
+          "default": 350,
+          "minimum": 0,
+          "markdownDescription": "Debounce delay in milliseconds before running workspace diagnostics."
+        },
+        "gsx.goplsCommand": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Optional explicit path to `gopls`. Leave empty to auto-detect `gopls` on PATH, `~/.local/bin/gopls`, or `~/go/bin/gopls`."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "test": "npm run compile && node --test ./test/*.test.js",
+    "watch": "tsc -w -p ./",
+    "prepackage": "npm run compile",
+    "package": "npx @vscode/vsce package"
+  },
+  "dependencies": {
+    "vscode-jsonrpc": "^8.2.0",
+    "vscode-languageclient": "^9.0.1",
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.12"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/vscode": "^1.90.0",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "Component": {
+    "prefix": "component",
+    "body": [
+      "component ${1:Name}(${2}) {",
+      "  ${0}",
+      "}"
+    ],
+    "description": "Create a GSX component"
+  },
+  "Layout": {
+    "prefix": "layout",
+    "body": [
+      "component ${1:Layout}(title string) {",
+      "  <!doctype html>",
+      "  <html>",
+      "    <head>",
+      "      <meta charset=\"utf-8\" />",
+      "      <title>{title}</title>",
+      "      <slot name=\"head\" />",
+      "    </head>",
+      "    <body>",
+      "      <slot />",
+      "    </body>",
+      "  </html>",
+      "}"
+    ],
+    "description": "Create a GSX layout component"
+  },
+  "If": {
+    "prefix": "if",
+    "body": [
+      "if ${1:condition} {",
+      "  ${0}",
+      "}"
+    ],
+    "description": "Insert an if block"
+  },
+  "ForRange": {
+    "prefix": "for",
+    "body": [
+      "for ${1:_, item := range items} {",
+      "  ${0}",
+      "}"
+    ],
+    "description": "Insert a for-range block"
+  },
+  "NamedSlot": {
+    "prefix": "slot",
+    "body": [
+      "<fragment slot=\"${1:head}\">",
+      "  ${0}",
+      "</fragment>"
+    ],
+    "description": "Insert named slot content"
+  },
+  "RawHTML": {
+    "prefix": "raw",
+    "body": [
+      "<raw html={${1:runtime.HTML(\"<strong>trusted</strong>\")}} />"
+    ],
+    "description": "Insert explicit trusted raw HTML"
+  }
+}

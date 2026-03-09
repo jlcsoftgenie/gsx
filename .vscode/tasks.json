@@ -1,0 +1,28 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "gsx-extension: compile",
+      "type": "npm",
+      "script": "compile",
+      "path": "editors/vscode/gsx",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": [
+        "$tsc"
+      ]
+    },
+    {
+      "label": "gsx-extension: watch",
+      "type": "npm",
+      "script": "watch",
+      "path": "editors/vscode/gsx",
+      "isBackground": true,
+      "problemMatcher": [
+        "$tsc-watch"
+      ]
+    }
+  ]
+}
