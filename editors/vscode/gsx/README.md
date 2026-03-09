@@ -2,6 +2,20 @@
 
 VS Code support for `.gsx` templates.
 
+Quick syntax reference:
+- `package` and `import` work like Go
+- `component Name(args...) { ... }` defines a typed GSX component
+- lowercase tags render HTML-like elements
+- capitalized tags call GSX components
+- `{expr}` embeds Go expressions
+- `if` / `else` / `for` use Go syntax
+- `<slot />`, `<slot name="...">`, and `slot="name"` support layouts
+- `<fragment>` groups children without rendering a wrapper
+- `<raw html={runtime.HTML(...)} />` is the explicit raw HTML escape hatch
+
+Full cheat sheet:
+- [`docs/cheatsheet.md`](../../../docs/cheatsheet.md)
+
 Features:
 - syntax highlighting for GSX tags, components, attributes, declarations, expressions, and comments
 - semantic tokens for Go-like regions such as component signatures, expressions, and control-flow headers

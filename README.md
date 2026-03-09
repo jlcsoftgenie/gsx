@@ -128,6 +128,7 @@ Supported template features:
 - imported GSX components with standard Go imports and aliases, for example `<shared.Panel />`
 
 See [docs/syntax.md](docs/syntax.md) for the full language and grammar.
+See [docs/cheatsheet.md](docs/cheatsheet.md) for a compact authoring reference.
 
 ## Slots And Layouts
 
