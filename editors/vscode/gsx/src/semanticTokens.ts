@@ -287,6 +287,10 @@ function tokenizeControlFlowHeaders(
       return;
     }
 
+    if (tokenizeDeclarationLine(line, lineStart, collector, parameterNames)) {
+      return;
+    }
+
     const elseMatch = /^(\s*)(else)\s*(\{)\s*$/.exec(line);
     if (elseMatch !== null) {
       const keywordOffset = lineStart + elseMatch[1].length;
@@ -419,6 +423,45 @@ function tokenizeGoSegment(
     }
     index++;
     afterDot = false;
+  }
+}
+
+function tokenizeDeclarationLine(
+  line: string,
+  lineStart: number,
+  collector: TokenCollector,
+  parameterNames?: ReadonlySet<string>
+): boolean {
+  const indentLength = line.search(/\S/);
+  if (indentLength < 0) {
+    return false;
+  }
+  const trimmed = line.slice(indentLength);
+  const baseOffset = lineStart + indentLength;
+
+  const shortDecl = /^([A-Za-z_][A-Za-z0-9_]*(?:\s*,\s*[A-Za-z_][A-Za-z0-9_]*)*)\s*:=\s*(.+)$/.exec(trimmed);
+  if (shortDecl !== null) {
+    tokenizeGoSegment(trimmed, baseOffset, collector, { parameterNames });
+    addDeclaredNames(shortDecl[1], baseOffset, collector);
+    return true;
+  }
+
+  const decl = /^(var|const)\s+(.+)$/.exec(trimmed);
+  if (decl === null) {
+    return false;
+  }
+  tokenizeGoSegment(trimmed, baseOffset, collector, { parameterNames });
+  const tailOffset = baseOffset + trimmed.indexOf(decl[2]);
+  const namesMatch = /^([A-Za-z_][A-Za-z0-9_]*(?:\s*,\s*[A-Za-z_][A-Za-z0-9_]*)*)/.exec(decl[2]);
+  if (namesMatch !== null) {
+    addDeclaredNames(namesMatch[1], tailOffset, collector);
+  }
+  return true;
+}
+
+function addDeclaredNames(segment: string, baseOffset: number, collector: TokenCollector): void {
+  for (const match of segment.matchAll(/[A-Za-z_][A-Za-z0-9_]*/g)) {
+    collector.add(baseOffset + (match.index ?? 0), match[0].length, 'variable', ['declaration'], 2);
   }
 }
 

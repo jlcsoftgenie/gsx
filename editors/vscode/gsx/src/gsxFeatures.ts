@@ -4,6 +4,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   CompletionItem,
   CompletionItemKind,
+  Diagnostic,
+  DiagnosticSeverity,
   DocumentSymbol,
   Hover,
   InsertTextFormat,
@@ -20,7 +22,13 @@ import {
   WorkspaceEdit
 } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
-import { goplsCompletion, goplsHover } from './goplsClient';
+import {
+  goplsCompletion,
+  goplsDefinition,
+  goplsDiagnostics,
+  goplsHover,
+  goplsReferences
+} from './goplsClient';
 
 const HTML_TAGS = [
   'a', 'abbr', 'address', 'article', 'aside', 'audio', 'b', 'base', 'blockquote', 'body', 'br',
@@ -124,7 +132,7 @@ interface ComponentDefinition {
 }
 
 interface HoverBinding {
-  kind: 'parameter' | 'loopVariable';
+  kind: 'parameter' | 'loopVariable' | 'localVariable' | 'localConstant';
   type: string;
   owner: string;
 }
@@ -201,6 +209,17 @@ interface EmbeddedGoProbe {
   position: Position;
 }
 
+interface EmbeddedGoOverlay {
+  uri: string;
+  text: string;
+  spans: OverlaySpan[];
+}
+
+interface OverlaySpan {
+  originalRange: Range;
+  overlayRange: Range;
+}
+
 export async function provideCompletionItems(
   document: TextDocument,
   position: Position,
@@ -240,7 +259,9 @@ export async function provideCompletionItems(
     items.push(
       snippetItem('if', 'if ${1:condition} {\n  ${0}\n}', 'If block'),
       snippetItem('for', 'for ${1:_, item := range items} {\n  ${0}\n}', 'For-range block'),
-      snippetItem('else', 'else {\n  ${0}\n}', 'Else block')
+      snippetItem('else', 'else {\n  ${0}\n}', 'Else block'),
+      snippetItem('const', 'const ${1:name} = ${0:value}', 'Local constant'),
+      snippetItem('var', 'var ${1:name} ${0:type}', 'Local variable')
     );
   }
 
@@ -294,7 +315,7 @@ export async function buildEmbeddedGoProbe(
   const probeLines: string[] = [];
   probeLines.push(`func __gsxProbe(${params}) {`);
   for (const [name, binding] of bindings) {
-    if (binding.kind !== 'loopVariable') {
+    if (binding.kind === 'parameter' || binding.type.trim() === '') {
       continue;
     }
     probeLines.push(`  var ${name} ${binding.type}`);
@@ -363,6 +384,120 @@ async function provideEmbeddedGoCompletionItems(
   }));
 }
 
+async function provideEmbeddedGoDefinition(
+  document: TextDocument,
+  position: Position,
+  options: FeatureOptions
+): Promise<LocationLink[] | null> {
+  if (options.goplsCommand === undefined) {
+    return null;
+  }
+  const overlay = await buildEmbeddedGoDocumentOverlay(document);
+  if (overlay === undefined) {
+    return null;
+  }
+  const overlayPosition = mapOriginalPositionToOverlay(overlay, position);
+  if (overlayPosition === undefined) {
+    return null;
+  }
+  const result = await goplsDefinition(options.goplsCommand, overlay.uri, overlay.text, overlayPosition);
+  const links = Array.isArray(result) ? result : result === undefined || result === null ? [] : [result];
+  const mapped = links
+    .map((item: any) => mapGoplsDefinitionLike(overlay, document, item))
+    .filter((item): item is LocationLink => item !== undefined);
+  return mapped.length > 0 ? mapped : null;
+}
+
+export async function provideEmbeddedGoDiagnostics(
+  document: TextDocument,
+  options: FeatureOptions = {}
+): Promise<Diagnostic[]> {
+  if (options.goplsCommand === undefined) {
+    return [];
+  }
+  const overlay = await buildEmbeddedGoDocumentOverlay(document);
+  if (overlay === undefined) {
+    return [];
+  }
+  const diagnostics = await goplsDiagnostics(options.goplsCommand, overlay.uri, overlay.text);
+  if (!Array.isArray(diagnostics) || diagnostics.length === 0) {
+    return [];
+  }
+  return diagnostics
+    .map((diagnostic) => mapGoplsDiagnostic(overlay, document, diagnostic))
+    .filter((item): item is Diagnostic => item !== undefined);
+}
+
+async function provideLocalBindingReferences(
+  document: TextDocument,
+  position: Position,
+  includeDeclaration: boolean,
+  options: FeatureOptions
+): Promise<Location[] | null> {
+  if (options.goplsCommand === undefined) {
+    return null;
+  }
+  const target = await localBindingRenameTarget(document, position);
+  if (target === undefined) {
+    return null;
+  }
+  const overlay = await buildEmbeddedGoDocumentOverlay(document);
+  if (overlay === undefined) {
+    return null;
+  }
+  const overlayPosition = mapOriginalPositionToOverlay(overlay, position);
+  if (overlayPosition === undefined) {
+    return null;
+  }
+  const result = await goplsReferences(options.goplsCommand, overlay.uri, overlay.text, overlayPosition, includeDeclaration);
+  const refs = Array.isArray(result) ? result : [];
+  const mapped = refs
+    .map((item: any) => mapGoplsLocation(overlay, document, item))
+    .filter((item): item is Location => item !== undefined);
+  return mapped.length > 0 ? mapped : null;
+}
+
+async function prepareLocalBindingRename(
+  document: TextDocument,
+  position: Position,
+  _options: FeatureOptions
+): Promise<Range | null> {
+  const target = await localBindingRenameTarget(document, position);
+  return target?.range ?? null;
+}
+
+async function provideLocalBindingRenameEdits(
+  document: TextDocument,
+  position: Position,
+  newName: string,
+  options: FeatureOptions
+): Promise<WorkspaceEdit | null> {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(newName) || options.goplsCommand === undefined) {
+    return null;
+  }
+  const target = await localBindingRenameTarget(document, position);
+  if (target === undefined) {
+    return null;
+  }
+  const overlay = await buildEmbeddedGoDocumentOverlay(document);
+  if (overlay === undefined) {
+    return null;
+  }
+  const overlayPosition = mapOriginalPositionToOverlay(overlay, position);
+  if (overlayPosition === undefined) {
+    return null;
+  }
+  const refs = await goplsReferences(options.goplsCommand, overlay.uri, overlay.text, overlayPosition, true);
+  if (!Array.isArray(refs) || refs.length === 0) {
+    return null;
+  }
+  const edits = refs
+    .map((item: any) => mapGoplsLocation(overlay, document, item))
+    .filter((item): item is Location => item !== undefined)
+    .map((item) => TextEdit.replace(item.range, newName));
+  return edits.length > 0 ? { changes: { [document.uri]: edits } } : null;
+}
+
 export function provideDocumentSymbols(document: TextDocument): DocumentSymbol[] {
   const definitions = [...parseComponentDefinitions(document.getText(), document.uri).values()];
   return definitions.map((definition) => {
@@ -389,7 +524,8 @@ export function provideDocumentSymbols(document: TextDocument): DocumentSymbol[]
 
 export async function provideDefinition(
   document: TextDocument,
-  position: Position
+  position: Position,
+  options: FeatureOptions = {}
 ): Promise<LocationLink[] | null> {
   const slot = await resolveSlotTarget(document, position);
   if (slot !== undefined) {
@@ -406,14 +542,15 @@ export async function provideDefinition(
   }
   const tag = componentTagNameContext(document, position);
   if (tag === undefined || !isComponentReference(tag.tagName)) {
-    return null;
+    return await provideEmbeddedGoDefinition(document, position, options);
   }
   const text = document.getText();
   const localDefinitions = parseComponentDefinitions(text, document.uri);
   const definition = localDefinitions.get(tag.tagName) ??
     await importedComponentDefinition(document.uri, text, tag.tagName);
   if (definition === undefined) {
-    return null;
+    const embedded = await provideEmbeddedGoDefinition(document, position, options);
+    return embedded ?? null;
   }
   return [{
     targetUri: definition.sourceUri ?? document.uri,
@@ -461,7 +598,8 @@ export async function provideSignatureHelp(
 export async function provideReferences(
   document: TextDocument,
   position: Position,
-  includeDeclaration: boolean
+  includeDeclaration: boolean,
+  options: FeatureOptions = {}
 ): Promise<Location[] | null> {
   const slotTarget = await resolveSlotTarget(document, position);
   if (slotTarget !== undefined) {
@@ -475,7 +613,7 @@ export async function provideReferences(
   }
   const target = await resolveComponentTarget(document, position);
   if (target === undefined) {
-    return null;
+    return await provideLocalBindingReferences(document, position, includeDeclaration, options);
   }
   const occurrences = await componentOccurrences(document.uri, target);
   return occurrences
@@ -488,20 +626,25 @@ export async function provideReferences(
 
 export async function prepareComponentRename(
   document: TextDocument,
-  position: Position
+  position: Position,
+  options: FeatureOptions = {}
 ): Promise<Range | null> {
   const slotTarget = await resolveSlotTarget(document, position);
   if (slotTarget !== undefined) {
     return slotTarget.originRange;
   }
   const target = await resolveComponentTarget(document, position);
-  return target?.originRange ?? null;
+  if (target !== undefined) {
+    return target.originRange;
+  }
+  return await prepareLocalBindingRename(document, position, options);
 }
 
 export async function provideRenameEdits(
   document: TextDocument,
   position: Position,
-  newName: string
+  newName: string,
+  options: FeatureOptions = {}
 ): Promise<WorkspaceEdit | null> {
   const slotTarget = await resolveSlotTarget(document, position);
   if (slotTarget !== undefined) {
@@ -517,11 +660,11 @@ export async function provideRenameEdits(
     }
     return { changes };
   }
-  if (!/^[A-Z][A-Za-z0-9_]*$/.test(newName)) {
-    return null;
-  }
   const target = await resolveComponentTarget(document, position);
   if (target === undefined) {
+    return await provideLocalBindingRenameEdits(document, position, newName, options);
+  }
+  if (!/^[A-Z][A-Za-z0-9_]*$/.test(newName)) {
     return null;
   }
   const occurrences = await componentOccurrences(document.uri, target);
@@ -1090,6 +1233,262 @@ function syntheticProbeURI(baseUri: string): string {
   return pathToFileURL(path.join(dir, name)).toString();
 }
 
+function embeddedOverlayURI(baseUri: string): string {
+  const filePath = uriToPath(baseUri);
+  const dir = path.dirname(filePath);
+  const stem = path.basename(filePath, path.extname(filePath));
+  return pathToFileURL(path.join(dir, `__gsx_overlay_${stem}.go`)).toString();
+}
+
+async function buildEmbeddedGoDocumentOverlay(document: TextDocument): Promise<EmbeddedGoOverlay | undefined> {
+  const text = document.getText();
+  const definitions = [...parseComponentDefinitions(text, document.uri).values()];
+  if (definitions.length === 0) {
+    return undefined;
+  }
+  const base = await probeOverlayBase(document.uri);
+  const originalLines = text.split(/\r?\n/);
+  const overlayLines = [...originalLines];
+  const spans: OverlaySpan[] = [];
+
+  for (const definition of definitions) {
+    const signatureLine = originalLines[definition.startLine] ?? '';
+    const match = /^(\s*)component\s+[A-Z][A-Za-z0-9_]*\s*\(.*\)\s*\{\s*$/.exec(signatureLine);
+    if (match === null) {
+      continue;
+    }
+    const overlaySignature = `${match[1]}func __gsxDocProbe${definition.name}(${definition.params.map((param) => `${param.name} ${param.type}`).join(', ')}) {`;
+    overlayLines[definition.startLine] = overlaySignature;
+    addComponentParamSpans(definition, overlaySignature, spans);
+
+    let depth = 1
+    for (let lineIndex = definition.startLine + 1; lineIndex < originalLines.length; lineIndex++) {
+      const originalLine = originalLines[lineIndex] ?? '';
+      const trimmed = originalLine.trim();
+      if (depth === 1 && trimmed === '}') {
+        overlayLines[lineIndex] = originalLine;
+        addIdentitySpan(lineIndex, originalLine, spans);
+        break;
+      }
+      if (trimmed === '') {
+        overlayLines[lineIndex] = '';
+        continue;
+      }
+      if (isTemplateStatementLine(trimmed)) {
+        overlayLines[lineIndex] = originalLine;
+        addIdentitySpan(lineIndex, originalLine, spans);
+        depth += braceDeltaForStatementLine(trimmed);
+        if (depth < 1) {
+          depth = 1;
+        }
+        continue;
+      }
+      const expressions = embeddedExpressionsInLine(originalLine);
+      if (expressions.length === 0) {
+        overlayLines[lineIndex] = '';
+        continue;
+      }
+      const indentLength = Math.max(0, originalLine.search(/\S/));
+      const indent = originalLine.slice(0, indentLength);
+      let overlayLine = indent;
+      let cursor = indent.length;
+      for (let index = 0; index < expressions.length; index++) {
+        const expression = expressions[index];
+        if (index > 0) {
+          overlayLine += '; ';
+          cursor += 2;
+        }
+        overlayLine += `_ = ${expression.text}`;
+        spans.push({
+          originalRange: {
+            start: { line: lineIndex, character: expression.start },
+            end: { line: lineIndex, character: expression.end }
+          },
+          overlayRange: {
+            start: { line: lineIndex, character: cursor + 4 },
+            end: { line: lineIndex, character: cursor + 4 + expression.text.length }
+          }
+        });
+        cursor += 4 + expression.text.length;
+      }
+      overlayLines[lineIndex] = overlayLine;
+    }
+  }
+
+  return {
+    uri: base?.uri ?? embeddedOverlayURI(document.uri),
+    text: overlayLines.join('\n'),
+    spans
+  };
+}
+
+function addComponentParamSpans(
+  definition: ComponentDefinition,
+  overlaySignature: string,
+  spans: OverlaySpan[]
+): void {
+  let cursor = overlaySignature.indexOf('(') + 1;
+  for (const param of definition.params) {
+    const matchIndex = overlaySignature.indexOf(param.name, cursor);
+    if (matchIndex < 0) {
+      continue;
+    }
+    spans.push({
+      originalRange: {
+        start: { line: definition.startLine, character: param.nameStartCharacter },
+        end: { line: definition.startLine, character: param.nameEndCharacter }
+      },
+      overlayRange: {
+        start: { line: definition.startLine, character: matchIndex },
+        end: { line: definition.startLine, character: matchIndex + param.name.length }
+      }
+    });
+    cursor = matchIndex + param.name.length;
+  }
+}
+
+function addIdentitySpan(lineIndex: number, line: string, spans: OverlaySpan[]): void {
+  spans.push({
+    originalRange: {
+      start: { line: lineIndex, character: 0 },
+      end: { line: lineIndex, character: line.length }
+    },
+    overlayRange: {
+      start: { line: lineIndex, character: 0 },
+      end: { line: lineIndex, character: line.length }
+    }
+  });
+}
+
+function isTemplateStatementLine(trimmed: string): boolean {
+  if (trimmed === '}') {
+    return true;
+  }
+  if (/^else(?:\s+if\b.*)?\{\s*$/.test(trimmed)) {
+    return true;
+  }
+  if (/^(?:if|for)\b.*\{\s*$/.test(trimmed)) {
+    return true;
+  }
+  if (/^(?:var|const)\b/.test(trimmed)) {
+    return true;
+  }
+  return /^(?:[A-Za-z_][A-Za-z0-9_]*(?:\s*,\s*[A-Za-z_][A-Za-z0-9_]*)*)\s*:=/.test(trimmed);
+}
+
+function braceDeltaForStatementLine(trimmed: string): number {
+  let delta = 0;
+  let quote: '"' | '\'' | '`' | undefined;
+  for (let index = 0; index < trimmed.length; index++) {
+    const ch = trimmed[index];
+    if (quote !== undefined) {
+      if (quote !== '`' && ch === '\\') {
+        index++;
+        continue;
+      }
+      if (ch === quote) {
+        quote = undefined;
+      }
+      continue;
+    }
+    if (ch === '"' || ch === '\'' || ch === '`') {
+      quote = ch;
+      continue;
+    }
+    if (ch === '{') {
+      delta++;
+    } else if (ch === '}') {
+      delta--;
+    }
+  }
+  return delta;
+}
+
+function embeddedExpressionsInLine(line: string): Array<{ start: number; end: number; text: string }> {
+  const out: Array<{ start: number; end: number; text: string }> = [];
+  const stack: number[] = [];
+  let quote: '"' | '\'' | '`' | undefined;
+  for (let index = 0; index < line.length; index++) {
+    const ch = line[index];
+    if (quote !== undefined) {
+      if (quote !== '`' && ch === '\\') {
+        index++;
+        continue;
+      }
+      if (ch === quote) {
+        quote = undefined;
+      }
+      continue;
+    }
+    if (ch === '"' || ch === '\'' || ch === '`') {
+      quote = ch;
+      continue;
+    }
+    if (ch === '{') {
+      stack.push(index);
+      continue;
+    }
+    if (ch === '}' && stack.length > 0) {
+      const start = stack.pop()!;
+      if (stack.length === 0 && index > start+1) {
+        out.push({
+          start: start + 1,
+          end: index,
+          text: line.slice(start + 1, index)
+        });
+      }
+    }
+  }
+  return out;
+}
+
+function mapOriginalPositionToOverlay(overlay: EmbeddedGoOverlay, position: Position): Position | undefined {
+  for (const span of overlay.spans) {
+    if (!positionWithinRange(position, span.originalRange)) {
+      continue;
+    }
+    if (position.line !== span.originalRange.start.line) {
+      continue;
+    }
+    const delta = position.character - span.originalRange.start.character;
+    return {
+      line: span.overlayRange.start.line,
+      character: span.overlayRange.start.character + delta
+    };
+  }
+  return undefined;
+}
+
+function mapOverlayPositionToOriginal(overlay: EmbeddedGoOverlay, position: Position): Position | undefined {
+  for (const span of overlay.spans) {
+    if (!positionWithinRange(position, span.overlayRange)) {
+      continue;
+    }
+    if (position.line !== span.overlayRange.start.line) {
+      continue;
+    }
+    const delta = position.character - span.overlayRange.start.character;
+    return {
+      line: span.originalRange.start.line,
+      character: span.originalRange.start.character + delta
+    };
+  }
+  return undefined;
+}
+
+function positionWithinRange(position: Position, range: Range): boolean {
+  if (position.line < range.start.line || position.line > range.end.line) {
+    return false;
+  }
+  if (position.line === range.start.line && position.character < range.start.character) {
+    return false;
+  }
+  if (position.line === range.end.line && position.character > range.end.character) {
+    return false;
+  }
+  return true;
+}
+
 function completionReplacementRange(document: TextDocument, position: Position): Range {
   const text = document.getText();
   const offset = document.offsetAt(position);
@@ -1102,6 +1501,139 @@ function completionReplacementRange(document: TextDocument, position: Position):
     end++;
   }
   return offsetRange(document, start, end);
+}
+
+function tokenRangeAt(document: TextDocument, position: Position): Range | undefined {
+  const text = document.getText();
+  const offset = document.offsetAt(position);
+  const pivot = offset < text.length && isTokenChar(text[offset]) ? offset : offset - 1;
+  if (pivot < 0 || !isTokenChar(text[pivot])) {
+    return undefined;
+  }
+  let start = pivot;
+  let end = pivot + 1;
+  while (start > 0 && isTokenChar(text[start - 1])) {
+    start--;
+  }
+  while (end < text.length && isTokenChar(text[end])) {
+    end++;
+  }
+  return offsetRange(document, start, end);
+}
+
+function mapGoplsDefinitionLike(
+  overlay: EmbeddedGoOverlay,
+  document: TextDocument,
+  item: any
+): LocationLink | undefined {
+  const targetUri = typeof item?.targetUri === 'string' ? item.targetUri : item?.uri;
+  const targetRange = item?.targetRange ?? item?.range;
+  const targetSelectionRange = item?.targetSelectionRange ?? item?.range;
+  const originSelectionRange = item?.originSelectionRange;
+  if (targetUri === undefined || targetRange === undefined || targetSelectionRange === undefined) {
+    return undefined;
+  }
+  if (targetUri !== overlay.uri) {
+    return {
+      targetUri,
+      targetRange,
+      targetSelectionRange,
+      originSelectionRange
+    };
+  }
+  const mappedTargetRange = mapOverlayRangeToOriginal(overlay, targetRange);
+  const mappedTargetSelectionRange = mapOverlayRangeToOriginal(overlay, targetSelectionRange);
+  if (mappedTargetRange === undefined || mappedTargetSelectionRange === undefined) {
+    return undefined;
+  }
+  return {
+    targetUri: document.uri,
+    targetRange: mappedTargetRange,
+    targetSelectionRange: mappedTargetSelectionRange,
+    originSelectionRange
+  };
+}
+
+function mapGoplsLocation(
+  overlay: EmbeddedGoOverlay,
+  document: TextDocument,
+  item: any
+): Location | undefined {
+  if (typeof item?.uri !== 'string' || item?.range === undefined) {
+    return undefined;
+  }
+  if (item.uri !== overlay.uri) {
+    return item as Location;
+  }
+  const mappedRange = mapOverlayRangeToOriginal(overlay, item.range);
+  if (mappedRange === undefined) {
+    return undefined;
+  }
+  return {
+    uri: document.uri,
+    range: mappedRange
+  };
+}
+
+function mapGoplsTextEdit(
+  overlay: EmbeddedGoOverlay,
+  document: TextDocument,
+  uri: string,
+  item: any
+): TextEdit | undefined {
+  if (uri !== overlay.uri || item?.range === undefined || typeof item?.newText !== 'string') {
+    return undefined;
+  }
+  const mappedRange = mapOverlayRangeToOriginal(overlay, item.range);
+  if (mappedRange === undefined) {
+    return undefined;
+  }
+  return TextEdit.replace(mappedRange, item.newText);
+}
+
+function mapGoplsDiagnostic(
+  overlay: EmbeddedGoOverlay,
+  document: TextDocument,
+  diagnostic: any
+): Diagnostic | undefined {
+  if (diagnostic?.range === undefined) {
+    return undefined;
+  }
+  const mappedRange = mapOverlayRangeToOriginal(overlay, diagnostic.range);
+  if (mappedRange === undefined) {
+    return undefined;
+  }
+  return {
+    severity: mapGoplsDiagnosticSeverity(diagnostic.severity),
+    message: typeof diagnostic.message === 'string' ? diagnostic.message : 'embedded Go diagnostic',
+    source: 'gopls',
+    code: diagnostic.code,
+    range: mappedRange
+  };
+}
+
+function mapGoplsDiagnosticSeverity(severity: number | undefined): DiagnosticSeverity {
+  switch (severity) {
+    case 1:
+      return DiagnosticSeverity.Error;
+    case 2:
+      return DiagnosticSeverity.Warning;
+    case 3:
+      return DiagnosticSeverity.Information;
+    case 4:
+      return DiagnosticSeverity.Hint;
+    default:
+      return DiagnosticSeverity.Error;
+  }
+}
+
+function mapOverlayRangeToOriginal(overlay: EmbeddedGoOverlay, range: Range): Range | undefined {
+  const start = mapOverlayPositionToOriginal(overlay, range.start);
+  const end = mapOverlayPositionToOriginal(overlay, range.end);
+  if (start === undefined || end === undefined) {
+    return undefined;
+  }
+  return { start, end };
 }
 
 async function resolveComponentTarget(
@@ -1798,7 +2330,7 @@ async function typedValueHover(
   if (tokenInfo.segmentIndex === 0) {
     const binding = bindings.get(tokenInfo.token);
     if (binding !== undefined) {
-      const label = binding.kind === 'parameter' ? 'Component parameter' : 'Loop variable';
+      const label = hoverBindingLabel(binding.kind);
       return `**${tokenInfo.token}**\n\nType: \`${binding.type}\`\n\n${label} in \`${binding.owner}\`.`;
     }
     return undefined;
@@ -1850,6 +2382,31 @@ function componentAtLine(
   return undefined;
 }
 
+async function localBindingRenameTarget(
+  document: TextDocument,
+  position: Position
+): Promise<{ range: Range; binding: HoverBinding } | undefined> {
+  const token = tokenInfoAt(document, position);
+  if (token === undefined || token.segmentIndex !== 0) {
+    return undefined;
+  }
+  const definitions = parseComponentDefinitions(document.getText(), document.uri);
+  const component = componentAtLine(definitions, position.line);
+  if (component === undefined) {
+    return undefined;
+  }
+  const structs = await loadStructFieldIndex(document.uri);
+  const binding = bindingsAtLine(document.getText(), component, position.line, structs).get(token.token);
+  if (binding === undefined || binding.kind === 'parameter') {
+    return undefined;
+  }
+  const range = tokenRangeAt(document, position);
+  if (range === undefined) {
+    return undefined;
+  }
+  return { range, binding };
+}
+
 function bindingsAtLine(
   text: string,
   component: ComponentDefinition,
@@ -1869,9 +2426,19 @@ function bindingsAtLine(
     if (trimmed === '') {
       continue;
     }
+    if (trimmed === '}') {
+      depth = Math.max(0, depth - 1);
+      pruneBindingsForDepth(scopeStack, depth);
+      continue;
+    }
+    const declarationBindings = inferDeclarationBindings(trimmed, currentBindings(base, scopeStack), structs, component.name);
+    if (declarationBindings.size > 0) {
+      mergeBindingsAtDepth(scopeStack, depth, declarationBindings);
+      continue;
+    }
     const loopBindings = inferLoopBindings(trimmed, currentBindings(base, scopeStack), structs, component.name);
     if (loopBindings.size > 0) {
-      scopeStack.push({ depth: depth + 1, bindings: loopBindings });
+      mergeBindingsAtDepth(scopeStack, depth+1, loopBindings);
       depth++;
       continue;
     }
@@ -1879,15 +2446,22 @@ function bindingsAtLine(
       depth++;
       continue;
     }
-    if (trimmed === '}') {
-      depth = Math.max(0, depth - 1);
-      while (scopeStack.length > 0 && scopeStack[scopeStack.length - 1].depth > depth) {
-        scopeStack.pop();
-      }
-    }
   }
 
   return currentBindings(base, scopeStack);
+}
+
+function hoverBindingLabel(kind: HoverBinding['kind']): string {
+  switch (kind) {
+    case 'parameter':
+      return 'Component parameter';
+    case 'loopVariable':
+      return 'Loop variable';
+    case 'localConstant':
+      return 'Local constant';
+    case 'localVariable':
+      return 'Local variable';
+  }
 }
 
 function currentBindings(
@@ -1901,6 +2475,85 @@ function currentBindings(
     }
   }
   return merged;
+}
+
+function mergeBindingsAtDepth(
+  scopeStack: Array<{ depth: number; bindings: Map<string, HoverBinding> }>,
+  depth: number,
+  bindings: Map<string, HoverBinding>
+): void {
+  if (bindings.size === 0) {
+    return;
+  }
+  const existing = scopeStack.find((scope) => scope.depth === depth);
+  if (existing !== undefined) {
+    for (const [name, binding] of bindings) {
+      existing.bindings.set(name, binding);
+    }
+    return;
+  }
+  scopeStack.push({ depth, bindings: new Map(bindings) });
+  scopeStack.sort((left, right) => left.depth - right.depth);
+}
+
+function pruneBindingsForDepth(
+  scopeStack: Array<{ depth: number; bindings: Map<string, HoverBinding> }>,
+  depth: number
+): void {
+  while (scopeStack.length > 0 && scopeStack[scopeStack.length - 1].depth > depth) {
+    scopeStack.pop();
+  }
+}
+
+function inferDeclarationBindings(
+  trimmedLine: string,
+  bindings: Map<string, HoverBinding>,
+  structs: StructFieldIndex,
+  owner: string
+): Map<string, HoverBinding> {
+  const out = new Map<string, HoverBinding>();
+  const shortDecl = /^([A-Za-z_][A-Za-z0-9_]*(?:\s*,\s*[A-Za-z_][A-Za-z0-9_]*)*)\s*:=\s*(.+)$/.exec(trimmedLine);
+  if (shortDecl !== null) {
+    const names = splitTopLevel(shortDecl[1]).map((name) => name.trim()).filter(Boolean);
+    const types = inferExpressionTypes(shortDecl[2], bindings, structs);
+    for (let index = 0; index < names.length; index++) {
+      const inferred = types[index] ?? (types.length === 1 ? types[0] : undefined);
+      if (inferred !== undefined) {
+        out.set(names[index], { kind: 'localVariable', type: inferred, owner });
+      }
+    }
+    return out;
+  }
+
+  const decl = /^(var|const)\s+(.+)$/.exec(trimmedLine);
+  if (decl === null) {
+    return out;
+  }
+  const kind: HoverBinding['kind'] = decl[1] === 'const' ? 'localConstant' : 'localVariable';
+  const tail = decl[2].trim();
+  const assignment = splitTopLevelAssignment(tail);
+  if (assignment !== undefined) {
+    const parsed = parseDeclaredNamesAndType(assignment.left);
+    const types = parsed.type !== undefined ? [parsed.type] : inferExpressionTypes(assignment.right, bindings, structs);
+    for (let index = 0; index < parsed.names.length; index++) {
+      const inferred = types[index] ?? (types.length === 1 ? types[0] : undefined);
+      if (inferred !== undefined) {
+        out.set(parsed.names[index], { kind, type: inferred, owner });
+      }
+    }
+    return out;
+  }
+  if (kind === 'localConstant') {
+    return out;
+  }
+  const parsed = parseDeclaredNamesAndType(tail);
+  if (parsed.type === undefined) {
+    return out;
+  }
+  for (const name of parsed.names) {
+    out.set(name, { kind, type: parsed.type, owner });
+  }
+  return out;
 }
 
 function inferLoopBindings(
@@ -1929,6 +2582,15 @@ function inferLoopBindings(
   return out;
 }
 
+function inferExpressionTypes(
+  exprList: string,
+  bindings: Map<string, HoverBinding>,
+  structs: StructFieldIndex
+): Array<string | undefined> {
+  return splitTopLevel(exprList)
+    .map((expr) => resolveExpressionType(expr.trim(), bindings, structs));
+}
+
 function rangeBindingTypes(rangeType: string, count: number): string[] {
   const normalized = rangeType.replace(/\s+/g, ' ').trim();
   const mapMatch = /^map\[(.+?)\](.+)$/.exec(normalized);
@@ -1955,11 +2617,72 @@ function resolveExpressionType(
   structs: StructFieldIndex
 ): string | undefined {
   const trimmed = expr.trim();
+  if (trimmed === '') {
+    return undefined;
+  }
+  if (/^(?:"(?:\\.|[^"])*"|'(?:\\.|[^'])*'|`[\s\S]*`)$/.test(trimmed)) {
+    return 'string';
+  }
+  if (/^(?:true|false)$/.test(trimmed)) {
+    return 'bool';
+  }
+  if (/^(?:0x[0-9A-Fa-f]+|\d+)$/.test(trimmed)) {
+    return 'int';
+  }
+  if (/^\d+\.\d+$/.test(trimmed)) {
+    return 'float64';
+  }
+  if (/^(?:len|cap)\s*\(.+\)$/.test(trimmed)) {
+    return 'int';
+  }
+  const newMatch = /^new\s*\(\s*(.+)\s*\)$/.exec(trimmed);
+  if (newMatch !== null) {
+    return `*${newMatch[1].trim()}`;
+  }
+  const makeMatch = /^make\s*\(\s*([^,]+?)(?:\s*,.*)?\)$/.exec(trimmed);
+  if (makeMatch !== null) {
+    return makeMatch[1].trim();
+  }
+  if (trimmed.startsWith('&')) {
+    const inner = resolveExpressionType(trimmed.slice(1), bindings, structs);
+    return inner === undefined ? undefined : `*${inner}`;
+  }
+  if (trimmed.startsWith('*')) {
+    const inner = resolveExpressionType(trimmed.slice(1), bindings, structs);
+    if (inner === undefined) {
+      return undefined;
+    }
+    return inner.startsWith('*') ? inner.slice(1).trim() : undefined;
+  }
+  const indexMatch = /^(.+)\[[^\]]+\]$/.exec(trimmed);
+  if (indexMatch !== null) {
+    const containerType = resolveExpressionType(indexMatch[1].trim(), bindings, structs);
+    return elementTypeForIndex(containerType);
+  }
   if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(trimmed)) {
     return bindings.get(trimmed)?.type;
   }
   if (/^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+$/.test(trimmed)) {
     return resolveSelectorType(trimmed.split('.'), bindings, structs);
+  }
+  return undefined;
+}
+
+function elementTypeForIndex(containerType: string | undefined): string | undefined {
+  if (containerType === undefined) {
+    return undefined;
+  }
+  const normalized = containerType.replace(/\s+/g, ' ').trim();
+  const mapMatch = /^map\[(.+?)\](.+)$/.exec(normalized);
+  if (mapMatch !== null) {
+    return mapMatch[2].trim();
+  }
+  const sliceMatch = /^\[(?:[^\]]*)\](.+)$/.exec(normalized);
+  if (sliceMatch !== null) {
+    return sliceMatch[1].trim();
+  }
+  if (normalized === 'string') {
+    return 'byte';
   }
   return undefined;
 }
@@ -1995,6 +2718,73 @@ function normalizeTypeName(typeName: string): string {
     normalized = normalized.slice(1).trim();
   }
   return normalized;
+}
+
+function splitTopLevelAssignment(text: string): { left: string; right: string } | undefined {
+  let parenDepth = 0;
+  let bracketDepth = 0;
+  let braceDepth = 0;
+  let quote: '"' | '\'' | '`' | undefined;
+  for (let index = 0; index < text.length; index++) {
+    const ch = text[index];
+    if (quote !== undefined) {
+      if (quote !== '`' && ch === '\\') {
+        index++;
+        continue;
+      }
+      if (ch === quote) {
+        quote = undefined;
+      }
+      continue;
+    }
+    if (ch === '"' || ch === '\'' || ch === '`') {
+      quote = ch;
+      continue;
+    }
+    switch (ch) {
+      case '(':
+        parenDepth++;
+        continue;
+      case ')':
+        parenDepth--;
+        continue;
+      case '[':
+        bracketDepth++;
+        continue;
+      case ']':
+        bracketDepth--;
+        continue;
+      case '{':
+        braceDepth++;
+        continue;
+      case '}':
+        braceDepth--;
+        continue;
+      case '=':
+        if (parenDepth !== 0 || bracketDepth !== 0 || braceDepth !== 0) {
+          continue;
+        }
+        if (text[index - 1] === ':' || text[index - 1] === '=' || text[index + 1] === '=') {
+          continue;
+        }
+        return {
+          left: text.slice(0, index).trim(),
+          right: text.slice(index + 1).trim()
+        };
+    }
+  }
+  return undefined;
+}
+
+function parseDeclaredNamesAndType(text: string): { names: string[]; type?: string } {
+  const match = /^([A-Za-z_][A-Za-z0-9_]*(?:\s*,\s*[A-Za-z_][A-Za-z0-9_]*)*)(?:\s+(.+))?$/.exec(text.trim());
+  if (match === null) {
+    return { names: [] };
+  }
+  return {
+    names: splitTopLevel(match[1]).map((name) => name.trim()).filter(Boolean),
+    type: match[2]?.trim()
+  };
 }
 
 async function loadStructFieldIndex(uri: string): Promise<StructFieldIndex> {

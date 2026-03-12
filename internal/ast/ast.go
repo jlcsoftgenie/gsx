@@ -70,6 +70,14 @@ type Expr struct {
 func (*Expr) node()                       {}
 func (n *Expr) GetSpan() diagnostics.Span { return n.Span }
 
+type Decl struct {
+	Code string
+	Span diagnostics.Span
+}
+
+func (*Decl) node()                       {}
+func (n *Decl) GetSpan() diagnostics.Span { return n.Span }
+
 type Comment struct {
 	Value string
 	Span  diagnostics.Span

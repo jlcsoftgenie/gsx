@@ -42,6 +42,7 @@ Supported node kinds inside component bodies:
 - HTML-like elements: `<div class="a">...</div>`
 - self-closing elements: `<img src={url} />`
 - component calls: `<Layout title={title}>...</Layout>`
+- local declarations: `count := len(users)`, `var first *User`, `const label = "Users"`
 - expressions: `{expr}`
 - conditionals: `if cond { ... } else if other { ... } else { ... }`
 - loops: `for _, item := range items { ... }`
@@ -141,6 +142,36 @@ Trusted raw HTML is explicit:
 
 `runtime.HTML` is the only raw HTML type recognized by generated output helpers.
 
+## Local declarations
+
+GSX supports constrained Go declaration statements inside component bodies.
+
+Supported forms:
+- short declarations: `count := len(users)`
+- `var` declarations: `var first *User`
+- `const` declarations: `const emptyLabel = "No users"`
+
+Example:
+
+```gsx
+component UsersPage(users []User) {
+  count := len(users)
+  const emptyLabel = "No users found."
+
+  if count == 0 {
+    <p>{emptyLabel}</p>
+  } else {
+    <p>{count} users found.</p>
+  }
+}
+```
+
+Rules:
+- declarations must be standalone statement lines
+- declarations follow normal Go block scoping
+- later expressions, `if`, `for`, and attributes can use declared names
+- reassignment and arbitrary statements are intentionally not supported in template bodies
+
 ## Whitespace rules
 
 GSX preserves authored text, with one deliberate normalization to make formatted templates render predictably:
@@ -171,13 +202,17 @@ ComponentDecl   = "component" Ident "(" ParamList? ")" TemplateBlock .
 ParamList       = Param { "," Param } .
 Param           = Ident TypeExpr .
 TemplateBlock   = "{" Node* "}" .
-Node            = Element | Doctype | Comment | Expr | IfStmt | ForStmt | Text .
+Node            = Element | Doctype | Comment | DeclStmt | Expr | IfStmt | ForStmt | Text .
 Element         = "<" Name Attr* ("/>" | ">" Node* "</" Name ">") .
 Name            = Ident { "." Ident } | dashed-name .
 Attr            = Name ["=" (StringLit | Expr)] .
+DeclStmt        = ShortDecl | VarDecl | ConstDecl .
+ShortDecl       = IdentList ":=" GoExpr .
+VarDecl         = "var" GoDeclLine .
+ConstDecl       = "const" GoDeclLine .
 Expr            = "{" GoExpr "}" .
 IfStmt          = "if" GoExpr TemplateBlock { "else" "if" GoExpr TemplateBlock } [ "else" TemplateBlock ] .
 ForStmt         = "for" GoHeader TemplateBlock .
 ```
 
-`GoExpr`, `GoHeader`, and `TypeExpr` are captured as balanced Go snippets and preserved verbatim in generated code.
+`GoExpr`, `GoHeader`, `GoDeclLine`, and `TypeExpr` are captured as balanced Go snippets and preserved verbatim in generated code.

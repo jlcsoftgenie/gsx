@@ -12,6 +12,11 @@ function documentFor(relativePath) {
   return TextDocument.create(pathToFileURL(filePath).toString(), 'gsx', 1, text);
 }
 
+function inlineDocument(relativePath, text) {
+  const filePath = path.resolve(__dirname, '..', '..', '..', '..', relativePath);
+  return TextDocument.create(pathToFileURL(filePath).toString(), 'gsx', 1, text);
+}
+
 async function hoverValue(relativePath, needle, occurrence, offsetInNeedle) {
   const document = documentFor(relativePath);
   const text = document.getText();
@@ -51,4 +56,42 @@ test('hover shows component prop types, loop variables, and selector field types
   const fieldHover = await hoverValue('examples/admin/pages.gsx', 'metric.Value', 1, 'metric.'.length);
   assert.match(fieldHover, /\*\*Value\*\*/);
   assert.match(fieldHover, /Field of `Metric`\./);
+});
+
+test('hover shows local declaration types and selector fields from local bindings', async () => {
+  const document = inlineDocument('examples/basic/__hover_local_decls.gsx', `package main
+
+component Page(users []User) {
+  count := len(users)
+  const emptyLabel = "No users"
+  var first *User
+
+  <section>
+    <p>{count}</p>
+    <p>{emptyLabel}</p>
+    <p>{first.Name}</p>
+  </section>
+}
+`);
+  const text = document.getText();
+
+  const countPosition = document.positionAt(text.indexOf('count := len(users)') + 'co'.length);
+  const countHover = await provideHover(document, countPosition);
+  assert.ok(countHover);
+  assert.match(countHover.contents.value, /\*\*count\*\*/);
+  assert.match(countHover.contents.value, /Type: `int`/);
+  assert.match(countHover.contents.value, /Local variable in `Page`\./);
+
+  const constPosition = document.positionAt(text.indexOf('emptyLabel = "No users"') + 'em'.length);
+  const constHover = await provideHover(document, constPosition);
+  assert.ok(constHover);
+  assert.match(constHover.contents.value, /\*\*emptyLabel\*\*/);
+  assert.match(constHover.contents.value, /Type: `string`/);
+  assert.match(constHover.contents.value, /Local constant in `Page`\./);
+
+  const fieldPosition = document.positionAt(text.indexOf('first.Name') + 'first.'.length);
+  const fieldHover = await provideHover(document, fieldPosition);
+  assert.ok(fieldHover);
+  assert.match(fieldHover.contents.value, /\*\*Name\*\*/);
+  assert.match(fieldHover.contents.value, /Field of `User`\./);
 });

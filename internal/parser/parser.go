@@ -2,6 +2,9 @@ package parser
 
 import (
 	"fmt"
+	goast "go/ast"
+	goparser "go/parser"
+	gotoken "go/token"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -211,6 +214,18 @@ func (p *Parser) parseNodeList(pos int, closingTag string, stopOnBrace bool) ([]
 			textStart = pos
 			continue
 		}
+		if onlyWhitespace(p.src.Text[textStart:pos]) {
+			node, next, ok := p.parseDecl(pos)
+			if ok {
+				nodes = append(nodes, p.textNode(textStart, pos)...)
+				if node != nil {
+					nodes = append(nodes, node)
+				}
+				pos = next
+				textStart = pos
+				continue
+			}
+		}
 		_, width := utf8.DecodeRuneInString(p.src.Text[pos:])
 		pos += width
 	}
@@ -292,6 +307,30 @@ func (p *Parser) parseFor(pos int) (ast.Node, int) {
 	headerEnd, blockStart := p.scanGoHeader(headerStart)
 	body, blockEnd := p.parseBlockNodes(blockStart + 1)
 	return &ast.For{Header: strings.TrimSpace(p.src.Text[headerStart:headerEnd]), Body: body, Span: p.src.Span(pos, blockEnd+1)}, blockEnd + 1
+}
+
+func (p *Parser) parseDecl(pos int) (ast.Node, int, bool) {
+	if !startsPotentialDecl(p.src.Text, pos) {
+		return nil, pos, false
+	}
+	end, found := p.scanGoStatementEnd(pos)
+	if !found {
+		p.error(p.src.Span(pos, pos), "P024", "unterminated declaration statement")
+		return nil, len(p.src.Text), true
+	}
+	code := strings.TrimSpace(p.src.Text[pos:end])
+	if code == "" {
+		return nil, pos, false
+	}
+	ok, err := isSupportedDeclStatement(code)
+	if !ok {
+		if err != nil {
+			p.error(p.src.Span(pos, end), "P025", err.Error())
+			return nil, end, true
+		}
+		return nil, pos, false
+	}
+	return &ast.Decl{Code: code, Span: p.src.Span(pos, end)}, end, true
 }
 
 func (p *Parser) parseElement(pos int) (ast.Node, int) {
@@ -479,6 +518,52 @@ func (p *Parser) scanGoHeader(start int) (int, int) {
 	return len(p.src.Text), len(p.src.Text)
 }
 
+func (p *Parser) scanGoStatementEnd(start int) (int, bool) {
+	round, square, brace := 0, 0, 0
+	for i := start; i < len(p.src.Text); i++ {
+		switch p.src.Text[i] {
+		case '\'', '"':
+			i = scanQuoted(p.src.Text, i)
+		case '`':
+			i = scanBacktick(p.src.Text, i)
+		case '/':
+			if hasPrefix(p.src.Text[i:], "//") {
+				i = scanLineComment(p.src.Text, i)
+				return i, true
+			}
+			if hasPrefix(p.src.Text[i:], "/*") {
+				i = scanBlockComment(p.src.Text, i)
+			}
+		case '(':
+			round++
+		case ')':
+			if round > 0 {
+				round--
+			}
+		case '[':
+			square++
+		case ']':
+			if square > 0 {
+				square--
+			}
+		case '{':
+			brace++
+		case '}':
+			if round == 0 && square == 0 && brace == 0 {
+				return i, true
+			}
+			if brace > 0 {
+				brace--
+			}
+		case '\n':
+			if round == 0 && square == 0 && brace == 0 {
+				return i, true
+			}
+		}
+	}
+	return len(p.src.Text), true
+}
+
 func (p *Parser) scanUntilTopLevelDelimiter(start int, delims ...byte) (int, byte) {
 	round, square, brace := 0, 0, 0
 	for i := start; i < len(p.src.Text); i++ {
@@ -552,6 +637,76 @@ func shouldDropText(value string) bool {
 
 func onlyWhitespace(value string) bool {
 	return strings.TrimSpace(value) == ""
+}
+
+func startsPotentialDecl(src string, pos int) bool {
+	if pos >= len(src) {
+		return false
+	}
+	if keywordAt(src, pos, "var") || keywordAt(src, pos, "const") {
+		return true
+	}
+	r, _ := utf8.DecodeRuneInString(src[pos:])
+	if !isDeclIdentStart(r) {
+		return false
+	}
+	end := pos
+	for end < len(src) && src[end] != '\n' && src[end] != '}' {
+		end++
+	}
+	segment := strings.TrimSpace(src[pos:end])
+	return strings.Contains(segment, ":=") || strings.Contains(segment, "=") || strings.Contains(segment, "++") || strings.Contains(segment, "--")
+}
+
+func isDeclIdentStart(r rune) bool {
+	return r == '_' || unicode.IsLetter(r)
+}
+
+func isSupportedDeclStatement(code string) (bool, error) {
+	trimmed := strings.TrimSpace(code)
+	src := "package gsxdecl\nfunc _() {\n" + trimmed + "\n}\n"
+	file, err := goparser.ParseFile(gotoken.NewFileSet(), "", src, 0)
+	if err != nil {
+		if strings.HasPrefix(trimmed, "var") || strings.HasPrefix(trimmed, "const") || strings.Contains(trimmed, ":=") {
+			return false, fmt.Errorf("invalid declaration statement")
+		}
+		return false, nil
+	}
+	if len(file.Decls) != 1 {
+		return false, nil
+	}
+	fn, ok := file.Decls[0].(*goast.FuncDecl)
+	if !ok || fn.Body == nil || len(fn.Body.List) != 1 {
+		if strings.HasPrefix(trimmed, "var") || strings.HasPrefix(trimmed, "const") || strings.Contains(trimmed, ":=") {
+			return false, fmt.Errorf("declaration statement must be a single statement line")
+		}
+		return false, nil
+	}
+	switch stmt := fn.Body.List[0].(type) {
+	case *goast.DeclStmt:
+		decl, ok := stmt.Decl.(*goast.GenDecl)
+		if !ok {
+			return false, fmt.Errorf("unsupported declaration statement")
+		}
+		if decl.Tok == gotoken.VAR || decl.Tok == gotoken.CONST {
+			return true, nil
+		}
+		return false, fmt.Errorf("only var and const declarations are supported in templates")
+	case *goast.AssignStmt:
+		if stmt.Tok == gotoken.DEFINE {
+			return true, nil
+		}
+		return false, fmt.Errorf("reassignment is not supported in template bodies; use := to declare a new variable")
+	case *goast.IncDecStmt:
+		return false, fmt.Errorf("reassignment is not supported in template bodies; move mutation into Go code")
+	case *goast.ExprStmt:
+		return false, fmt.Errorf("standalone statements are not supported in template bodies")
+	default:
+		if strings.Contains(trimmed, ":=") {
+			return false, fmt.Errorf("invalid declaration statement")
+		}
+		return false, fmt.Errorf("only local declarations, if blocks, and for blocks are supported in template bodies")
+	}
 }
 
 func keywordAt(src string, pos int, keyword string) bool {

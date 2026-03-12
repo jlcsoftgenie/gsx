@@ -68,6 +68,33 @@ Use expressions in attributes too:
 <input value={query} />
 ```
 
+## Local Declarations
+
+Use standalone Go declarations when repeating a view-local value:
+
+```gsx
+count := len(users)
+const emptyLabel = "No users"
+var first *User
+```
+
+Then use them in later expressions or branches:
+
+```gsx
+if count == 0 {
+  <p>{emptyLabel}</p>
+}
+```
+
+Supported:
+- `:=`
+- `var`
+- `const`
+
+Not supported:
+- reassignment like `count = 1`
+- arbitrary standalone statements
+
 ## Conditionals
 
 ```gsx

@@ -34,8 +34,7 @@ func Discover(root string) ([]Package, []diagnostics.Diagnostic, error) {
 			return err
 		}
 		if d.IsDir() {
-			base := filepath.Base(path)
-			if base == ".git" || base == "vendor" || strings.HasPrefix(base, ".") && path != root {
+			if ShouldSkipDir(root, path) {
 				return filepath.SkipDir
 			}
 			return nil

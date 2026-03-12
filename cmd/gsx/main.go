@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	version    = "0.2.0"
+	version    = "0.2.8"
 	modulePath = "github.com/jlcsoftgenie/gsx"
 )
 
@@ -76,7 +76,16 @@ func runGenerate(args []string) error {
 	if renderDiagnostics(diags, loaded.filesByPath); hasErrors(diags) {
 		return errors.New("generation failed")
 	}
+	cacheSet, err := loadCacheSet(roots, loaded.projectByDir)
+	if err != nil {
+		return err
+	}
+	fingerprints := computePackageFingerprints(loaded.pkgs)
 	for _, pkg := range loaded.pkgs {
+		root := cacheSet.rootForPackage(pkg)
+		if root != "" && cacheSet.shouldSkip(root, pkg, fingerprints[pkg.Dir]) {
+			continue
+		}
 		for _, file := range pkg.Files {
 			out, err := codegen.GenerateFile(pkg, file)
 			if err != nil {
@@ -87,6 +96,12 @@ func runGenerate(args []string) error {
 				return err
 			}
 		}
+		if root != "" {
+			cacheSet.record(root, pkg, fingerprints[pkg.Dir])
+		}
+	}
+	if err := cacheSet.save(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -196,7 +211,7 @@ func runFmt(args []string) error {
 
 func runWatch(args []string) error {
 	fs := flag.NewFlagSet("watch", flag.ContinueOnError)
-	interval := fs.Duration("interval", 500*time.Millisecond, "poll interval")
+	interval := fs.Duration("interval", 250*time.Millisecond, "event debounce interval")
 	build := fs.Bool("build", false, "run build instead of generate")
 	command := fs.String("command", "", "shell command to run after a successful cycle")
 	if err := fs.Parse(args); err != nil {
@@ -214,27 +229,7 @@ func runWatch(args []string) error {
 	if *build {
 		runCycle = runBuild
 	}
-	lastState := ""
-	for {
-		state, err := templateState(roots)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			time.Sleep(*interval)
-			continue
-		}
-		if state != lastState {
-			lastState = state
-			fmt.Fprintln(os.Stderr, "gsx: change detected")
-			if err := runCycle(roots); err != nil {
-				fmt.Fprintln(os.Stderr, err)
-			} else if *command != "" {
-				if err := runShellCommand(roots[0], *command); err != nil {
-					fmt.Fprintln(os.Stderr, err)
-				}
-			}
-		}
-		time.Sleep(*interval)
-	}
+	return watchRoots(roots, *interval, *build, runCycle, *command)
 }
 
 func runInit(args []string) error {
@@ -278,12 +273,13 @@ func runInit(args []string) error {
 }
 
 type loadedPackages struct {
-	pkgs        []*compiler.Package
-	filesByPath map[string]*ast.File
+	pkgs         []*compiler.Package
+	filesByPath  map[string]*ast.File
+	projectByDir map[string]project.Package
 }
 
 func loadPackages(roots []string) (*loadedPackages, []diagnostics.Diagnostic, error) {
-	all := &loadedPackages{filesByPath: map[string]*ast.File{}}
+	all := &loadedPackages{filesByPath: map[string]*ast.File{}, projectByDir: map[string]project.Package{}}
 	registry := compiler.NewRegistry()
 	var diags []diagnostics.Diagnostic
 	seenDirs := map[string]bool{}
@@ -299,6 +295,7 @@ func loadPackages(roots []string) (*loadedPackages, []diagnostics.Diagnostic, er
 				continue
 			}
 			seenDirs[projectPkg.Dir] = true
+			all.projectByDir[projectPkg.Dir] = projectPkg
 			for _, file := range projectPkg.Files {
 				all.filesByPath[file.Path] = file
 			}
@@ -418,22 +415,6 @@ func hasWarnings(diags []diagnostics.Diagnostic) bool {
 		}
 	}
 	return false
-}
-
-func templateState(roots []string) (string, error) {
-	files, err := collectTemplateFiles(roots)
-	if err != nil {
-		return "", err
-	}
-	var b strings.Builder
-	for _, file := range files {
-		info, err := os.Stat(file)
-		if err != nil {
-			return "", err
-		}
-		fmt.Fprintf(&b, "%s:%d:%d\n", file, info.Size(), info.ModTime().UnixNano())
-	}
-	return b.String(), nil
 }
 
 func runShellCommand(dir, command string) error {

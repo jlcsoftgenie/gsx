@@ -118,6 +118,7 @@ File structure:
 Supported template features:
 - HTML-like elements and self-closing tags
 - `{expr}` for Go expressions
+- local declarations with `:=`, `var`, and `const`
 - `if / else if / else`
 - `for` loops
 - comments: `<!-- -->`
@@ -166,6 +167,10 @@ gsx check .
 gsx watch --build .
 gsx init --module example.com/myapp ./myapp
 ```
+
+Notes:
+- `generate` stores package fingerprints in `.gsx/cache.json` and skips unchanged packages
+- `watch` uses `fsnotify` with debouncing instead of polling
 
 Formatting and linting:
 

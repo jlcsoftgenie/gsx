@@ -3,6 +3,10 @@ package formatter
 import (
 	"bytes"
 	"fmt"
+	goast "go/ast"
+	"go/format"
+	goparser "go/parser"
+	"go/token"
 	"strings"
 
 	"github.com/jlcsoftgenie/gsx/internal/ast"
@@ -93,6 +97,8 @@ func (p *printer) printNode(node ast.Node) {
 		}
 	case *ast.Expr:
 		p.line("{%s}", strings.TrimSpace(n.Code))
+	case *ast.Decl:
+		p.line("%s", formatGoStatement(n.Code))
 	case *ast.Comment:
 		p.line("<!--%s-->", strings.TrimSpace(n.Value))
 	case *ast.Doctype:
@@ -238,4 +244,22 @@ func (p *printer) line(format string, args ...any) {
 		p.buf.WriteString(fmt.Sprintf(format, args...))
 	}
 	p.buf.WriteByte('\n')
+}
+
+func formatGoStatement(code string) string {
+	src := "package gsxfmt\nfunc _() {\n" + code + "\n}\n"
+	fset := token.NewFileSet()
+	file, err := goparser.ParseFile(fset, "", src, 0)
+	if err != nil || len(file.Decls) != 1 {
+		return strings.TrimSpace(code)
+	}
+	fn, ok := file.Decls[0].(*goast.FuncDecl)
+	if !ok || fn.Body == nil || len(fn.Body.List) != 1 {
+		return strings.TrimSpace(code)
+	}
+	var buf bytes.Buffer
+	if err := format.Node(&buf, fset, fn.Body.List[0]); err != nil {
+		return strings.TrimSpace(code)
+	}
+	return strings.TrimSpace(buf.String())
 }

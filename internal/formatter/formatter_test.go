@@ -57,3 +57,24 @@ component Card(metric Metric) {
 		t.Fatalf("got:\n%s\nwant:\n%s", out, want)
 	}
 }
+
+func TestFormatDeclarationStatements(t *testing.T) {
+	src := "package pages\ncomponent Home(users []User){count:=len(users)\nconst emptyLabel=\"No users\"\nif count == 0 {<p>{emptyLabel}</p>}}"
+	out, err := Format("home.gsx", src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `package pages
+
+component Home(users []User) {
+  count := len(users)
+  const emptyLabel = "No users"
+  if count == 0 {
+    <p>{emptyLabel}</p>
+  }
+}
+`
+	if out != want {
+		t.Fatalf("got:\n%s\nwant:\n%s", out, want)
+	}
+}

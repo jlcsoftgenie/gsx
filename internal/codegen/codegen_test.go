@@ -215,3 +215,45 @@ component Home(title string, count int, active bool) {
 		}
 	}
 }
+
+func TestGenerateFileSupportsLocalDeclarationStatements(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.com/localdecl\n\ngo 1.23.0\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	src := `package pages
+
+component Home(users []string) {
+  count := len(users)
+  const emptyLabel = "No users"
+  if count == 0 {
+    <p>{emptyLabel}</p>
+  } else {
+    <p>{count}</p>
+  }
+}
+`
+	file, diags := parser.ParseFile(filepath.Join(dir, "home.gsx"), src)
+	if len(diags) > 0 {
+		t.Fatalf("parse diagnostics: %+v", diags)
+	}
+	pkg, diags := compiler.BuildPackage(dir, "example.com/localdecl", []*ast.File{file})
+	if len(diags) > 0 {
+		t.Fatalf("compile diagnostics: %+v", diags)
+	}
+	out, err := GenerateFile(pkg, file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"count := len(users)",
+		`const emptyLabel = "No users"`,
+		"WriteEscapedString(w, string(emptyLabel))",
+		"WriteInt64(w, int64(count))",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("generated output missing %q\n%s", want, text)
+		}
+	}
+}

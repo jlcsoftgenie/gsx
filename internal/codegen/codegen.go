@@ -151,6 +151,9 @@ func (g *generator) emitNode(node ast.Node, stripSlot bool) error {
 	case *ast.Expr:
 		g.flushStatic()
 		g.emitExprWrite(n.Code, n.Span)
+	case *ast.Decl:
+		g.flushStatic()
+		g.line("%s", n.Code)
 	case *ast.Comment:
 		g.appendStatic("<!--" + n.Value + "-->")
 	case *ast.Doctype:

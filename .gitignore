@@ -4,6 +4,7 @@
 *.out
 *.test
 coverage.txt
+.gsx/
 
 editors/vscode/gsx/node_modules/
 editors/vscode/gsx/dist/

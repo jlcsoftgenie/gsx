@@ -18,6 +18,8 @@ Behavior:
 - groups files by directory/package
 - resolves imported GSX packages by Go import path when they are discoverable under the requested roots
 - fails on parse or compile diagnostics
+- stores package fingerprints in `.gsx/cache.json`
+- skips regeneration for unchanged packages while still validating the full template graph
 - writes only when generated output changed
 
 ### `gsx build`
@@ -74,7 +76,7 @@ If no flags are passed, `fmt` writes in place.
 
 ### `gsx watch`
 
-Runs `generate` in a polling loop whenever `.gsx` files change.
+Runs `generate` in an `fsnotify` loop whenever relevant files change.
 
 ```bash
 gsx watch .
@@ -83,11 +85,11 @@ gsx watch --build --command 'go test ./...' .
 ```
 
 Flags:
-- `--interval`: poll interval, default `500ms`
+- `--interval`: debounce interval for coalescing rapid file events, default `250ms`
 - `--build`: run `build` instead of `generate`
 - `--command`: shell command to run after a successful cycle
 
-The current implementation uses polling instead of OS-specific file watch APIs to keep the tool portable and dependency-light.
+In `--build` mode, `watch` also reacts to `.go`, `go.mod`, `go.sum`, `go.work`, and `go.work.sum` changes.
 
 ### `gsx init`
 

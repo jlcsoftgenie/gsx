@@ -31,6 +31,7 @@ import {
   provideCompletionItems,
   provideDefinition,
   provideDocumentSymbols,
+  provideEmbeddedGoDiagnostics,
   provideHover,
   prepareComponentRename,
   provideReferences,
@@ -147,7 +148,8 @@ connection.onDefinition(async (params): Promise<LocationLink[] | null> => {
   if (document === undefined) {
     return null;
   }
-  return provideDefinition(document, params.position);
+  const settings = await getSettings(document.uri);
+  return provideDefinition(document, params.position, { goplsCommand: settings.goplsCommand });
 });
 
 connection.onReferences(async (params): Promise<Location[] | null> => {
@@ -155,7 +157,8 @@ connection.onReferences(async (params): Promise<Location[] | null> => {
   if (document === undefined) {
     return null;
   }
-  return provideReferences(document, params.position, params.context.includeDeclaration);
+  const settings = await getSettings(document.uri);
+  return provideReferences(document, params.position, params.context.includeDeclaration, { goplsCommand: settings.goplsCommand });
 });
 
 connection.onPrepareRename(async (params): Promise<PrepareRenameResult | null> => {
@@ -163,7 +166,8 @@ connection.onPrepareRename(async (params): Promise<PrepareRenameResult | null> =
   if (document === undefined) {
     return null;
   }
-  return prepareComponentRename(document, params.position);
+  const settings = await getSettings(document.uri);
+  return prepareComponentRename(document, params.position, { goplsCommand: settings.goplsCommand });
 });
 
 connection.onRenameRequest(async (params) => {
@@ -171,7 +175,8 @@ connection.onRenameRequest(async (params) => {
   if (document === undefined) {
     return null;
   }
-  return provideRenameEdits(document, params.position, params.newName);
+  const settings = await getSettings(document.uri);
+  return provideRenameEdits(document, params.position, params.newName, { goplsCommand: settings.goplsCommand });
 });
 
 connection.onCodeAction(async (params): Promise<CodeAction[]> => {
@@ -221,6 +226,10 @@ documents.onDidOpen(async (event) => {
   }
 });
 
+documents.onDidChangeContent((event) => {
+  scheduleCheck(event.document.uri);
+});
+
 documents.onDidSave(async (event) => {
   const settings = await getSettings(event.document.uri);
   if (settings.checkOnSave) {
@@ -245,7 +254,7 @@ connection.onRequest('gsx/runCheck', async (params: RunCheckParams): Promise<Run
   const root = await workspaceRootForURI(params.uri);
   const result = await runCheck(root);
   if (!result.commandFailed) {
-    publishDiagnostics(root, result.diagnosticsByFile);
+    publishDiagnostics(root, await mergeEmbeddedGoDiagnostics(root, result.diagnosticsByFile));
   }
   if (result.commandFailed) {
     return {
@@ -278,8 +287,31 @@ async function refreshDiagnostics(root: string): Promise<void> {
   clearScheduled(root);
   const result = await runCheck(root);
   if (!result.commandFailed) {
-    publishDiagnostics(root, result.diagnosticsByFile);
+    publishDiagnostics(root, await mergeEmbeddedGoDiagnostics(root, result.diagnosticsByFile));
   }
+}
+
+async function mergeEmbeddedGoDiagnostics(
+  root: string,
+  diagnosticsByFile: Map<string, Diagnostic[]>
+): Promise<Map<string, Diagnostic[]>> {
+  const merged = new Map<string, Diagnostic[]>();
+  for (const [filePath, diagnostics] of diagnosticsByFile) {
+    merged.set(filePath, [...diagnostics]);
+  }
+  for (const document of documents.all()) {
+    const filePath = fileURLToPath(document.uri);
+    if (!(filePath === root || filePath.startsWith(root + path.sep))) {
+      continue;
+    }
+    const settings = await getSettings(document.uri);
+    const diagnostics = await provideEmbeddedGoDiagnostics(document, { goplsCommand: settings.goplsCommand });
+    if (diagnostics.length === 0) {
+      continue;
+    }
+    merged.set(filePath, [...(merged.get(filePath) ?? []), ...diagnostics]);
+  }
+  return merged;
 }
 
 function publishDiagnostics(root: string, byFile: Map<string, Diagnostic[]>): void {

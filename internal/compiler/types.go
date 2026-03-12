@@ -205,6 +205,8 @@ func (b *typecheckBuilder) collectImports(file *gsxast.File, comp *gsxast.Compon
 func (b *typecheckBuilder) collectImportsFromNodes(file *gsxast.File, nodes []gsxast.Node) {
 	for _, node := range nodes {
 		switch n := node.(type) {
+		case *gsxast.Decl:
+			b.collectImportsFromCode(file, n.Code)
 		case *gsxast.Expr:
 			b.collectImportsFromCode(file, n.Code)
 		case *gsxast.If:
@@ -254,6 +256,8 @@ func (b *typecheckBuilder) emitComponent(comp *gsxast.ComponentDecl) {
 func (b *typecheckBuilder) emitNodes(nodes []gsxast.Node) {
 	for _, node := range nodes {
 		switch n := node.(type) {
+		case *gsxast.Decl:
+			b.line("%s", n.Code)
 		case *gsxast.Expr:
 			b.markExpr(n.Code, n.Span)
 		case *gsxast.If:
