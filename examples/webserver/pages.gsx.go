@@ -75,8 +75,29 @@ func renderUserTable(w gsxio.Writer, __gsx_slots GSXUserTableSlots, users []User
 		return err
 	}
 	for _, user := range users {
-		if err := renderUserRow(w, GSXUserRowSlots{}, user); err != nil {
-			return err
+		{
+			user := user
+			if err := gsxrt.WriteString(w, "<tr><td>"); err != nil {
+				return err
+			}
+			if err := gsxrt.WriteEscapedString(w, string(user.Name)); err != nil {
+				return err
+			}
+			if err := gsxrt.WriteString(w, "</td><td>"); err != nil {
+				return err
+			}
+			if err := gsxrt.WriteEscapedString(w, string(user.Email)); err != nil {
+				return err
+			}
+			if err := gsxrt.WriteString(w, "</td><td>"); err != nil {
+				return err
+			}
+			if err := gsxrt.WriteEscapedString(w, string(user.Role)); err != nil {
+				return err
+			}
+			if err := gsxrt.WriteString(w, "</td></tr>"); err != nil {
+				return err
+			}
 		}
 	}
 	if err := gsxrt.WriteString(w, "</tbody></table>"); err != nil {
@@ -110,8 +131,10 @@ func renderHomePage(w gsxio.Writer, __gsx_slots GSXHomePageSlots, title string, 
 			return nil
 		},
 		Default: func(w gsxio.Writer) error {
-			if err := renderSiteNav(w, GSXSiteNavSlots{}); err != nil {
-				return err
+			{
+				if err := gsxrt.WriteString(w, "<nav><a href=\"/\">Home</a><span> | </span><a href=\"/users\">Users</a><span> | </span><a href=\"/healthz\">Health</a></nav>"); err != nil {
+					return err
+				}
 			}
 			if err := gsxrt.WriteString(w, "<section><h1>"); err != nil {
 				return err
@@ -161,8 +184,10 @@ func renderUsersPage(w gsxio.Writer, __gsx_slots GSXUsersPageSlots, title string
 			return nil
 		},
 		Default: func(w gsxio.Writer) error {
-			if err := renderSiteNav(w, GSXSiteNavSlots{}); err != nil {
-				return err
+			{
+				if err := gsxrt.WriteString(w, "<nav><a href=\"/\">Home</a><span> | </span><a href=\"/users\">Users</a><span> | </span><a href=\"/healthz\">Health</a></nav>"); err != nil {
+					return err
+				}
 			}
 			if err := gsxrt.WriteString(w, "<section><h1>"); err != nil {
 				return err
@@ -178,8 +203,40 @@ func renderUsersPage(w gsxio.Writer, __gsx_slots GSXUsersPageSlots, title string
 					return err
 				}
 			} else {
-				if err := renderUserTable(w, GSXUserTableSlots{}, users); err != nil {
-					return err
+				{
+					users := users
+					if err := gsxrt.WriteString(w, "<table><thead><tr><th>Name</th><th>Email</th><th>Role</th></tr></thead><tbody>"); err != nil {
+						return err
+					}
+					for _, user := range users {
+						{
+							user := user
+							if err := gsxrt.WriteString(w, "<tr><td>"); err != nil {
+								return err
+							}
+							if err := gsxrt.WriteEscapedString(w, string(user.Name)); err != nil {
+								return err
+							}
+							if err := gsxrt.WriteString(w, "</td><td>"); err != nil {
+								return err
+							}
+							if err := gsxrt.WriteEscapedString(w, string(user.Email)); err != nil {
+								return err
+							}
+							if err := gsxrt.WriteString(w, "</td><td>"); err != nil {
+								return err
+							}
+							if err := gsxrt.WriteEscapedString(w, string(user.Role)); err != nil {
+								return err
+							}
+							if err := gsxrt.WriteString(w, "</td></tr>"); err != nil {
+								return err
+							}
+						}
+					}
+					if err := gsxrt.WriteString(w, "</tbody></table>"); err != nil {
+						return err
+					}
 				}
 			}
 			if err := gsxrt.WriteString(w, "</section>"); err != nil {

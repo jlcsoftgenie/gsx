@@ -55,3 +55,23 @@ func TestWriteTypedEscapedString(t *testing.T) {
 		t.Fatalf("got %q", b.String())
 	}
 }
+
+func TestWriteTypedEscapedBytes(t *testing.T) {
+	var b strings.Builder
+	if err := WriteEscapedBytes(&b, []byte(`<b>hi</b>`)); err != nil {
+		t.Fatal(err)
+	}
+	if b.String() != "&lt;b&gt;hi&lt;/b&gt;" {
+		t.Fatalf("got %q", b.String())
+	}
+}
+
+func TestWriteAttrBytes(t *testing.T) {
+	var b strings.Builder
+	if err := WriteAttrBytes(&b, "data-name", []byte(`A&B`)); err != nil {
+		t.Fatal(err)
+	}
+	if b.String() != ` data-name="A&amp;B"` {
+		t.Fatalf("got %q", b.String())
+	}
+}

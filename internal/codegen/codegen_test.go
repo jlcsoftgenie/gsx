@@ -138,11 +138,21 @@ component Shell(title string) {
 	}
 	text := string(out)
 	for _, want := range []string{
-		"Head: __gsx_slots.Head,",
-		"Default: func(w gsxio.Writer) error {",
+		`<section class=\"shell\">`,
+		"__gsx_slots.Head",
+		"__gsx_slots.Default",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("generated output missing %q\n%s", want, text)
+		}
+	}
+	for _, notWant := range []string{
+		"title := title",
+		"Head: __gsx_slots.Head,",
+		"Default: func(w gsxio.Writer) error {",
+	} {
+		if strings.Contains(text, notWant) {
+			t.Fatalf("generated output should not contain %q\n%s", notWant, text)
 		}
 	}
 }
@@ -177,7 +187,7 @@ component Home(title string) {
 
 func TestGenerateFileUsesTypedWritersWhenTypeInfoIsAvailable(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.com/typed\n\ngo 1.23.0\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.com/typed\n\ngo 1.26.0\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	src := `package pages
@@ -216,9 +226,46 @@ component Home(title string, count int, active bool) {
 	}
 }
 
+func TestGenerateFileUsesTypedByteWritersWhenTypeInfoIsAvailable(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.com/bytes\n\ngo 1.26.0\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	src := `package pages
+
+component Home(label []byte) {
+  <main data-label={label}>{label}</main>
+}
+`
+	file, diags := parser.ParseFile(filepath.Join(dir, "home.gsx"), src)
+	if len(diags) > 0 {
+		t.Fatalf("parse diagnostics: %+v", diags)
+	}
+	pkg, diags := compiler.BuildPackage(dir, "example.com/bytes", []*ast.File{file})
+	if len(diags) > 0 {
+		t.Fatalf("compile diagnostics: %+v", diags)
+	}
+	out, err := GenerateFile(pkg, file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(out)
+	for _, want := range []string{
+		"WriteAttrBytes",
+		"WriteEscapedBytes",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("generated output missing %q\n%s", want, text)
+		}
+	}
+	if strings.Contains(text, "string(label)") {
+		t.Fatalf("generated output should not convert []byte expression to string\n%s", text)
+	}
+}
+
 func TestGenerateFileSupportsLocalDeclarationStatements(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.com/localdecl\n\ngo 1.23.0\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.com/localdecl\n\ngo 1.26.0\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	src := `package pages

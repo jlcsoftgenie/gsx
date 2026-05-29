@@ -3,6 +3,8 @@ package benchmarks
 import (
 	"bytes"
 	"html/template"
+	"io"
+	"net/http/httptest"
 	"testing"
 
 	g "maragu.dev/gomponents"
@@ -25,6 +27,35 @@ func BenchmarkGSXSimple(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		var buf bytes.Buffer
 		if err := RenderBenchSimple(&buf, "Bench"); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkGSXSimpleDiscard(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		if err := RenderBenchSimple(io.Discard, "Bench"); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkGSXSimpleResponseRecorder(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		rec := httptest.NewRecorder()
+		if err := RenderBenchSimple(rec, "Bench"); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkGSXSimplePlainWriter(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		var w countingWriter
+		if err := RenderBenchSimple(&w, "Bench"); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -71,6 +102,38 @@ func BenchmarkGSXList(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		var buf bytes.Buffer
 		if err := RenderBenchList(&buf, "Bench", users); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkGSXListDiscard(b *testing.B) {
+	b.ReportAllocs()
+	users := benchUsers(200)
+	for i := 0; i < b.N; i++ {
+		if err := RenderBenchList(io.Discard, "Bench", users); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkGSXListResponseRecorder(b *testing.B) {
+	b.ReportAllocs()
+	users := benchUsers(200)
+	for i := 0; i < b.N; i++ {
+		rec := httptest.NewRecorder()
+		if err := RenderBenchList(rec, "Bench", users); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkGSXListPlainWriter(b *testing.B) {
+	b.ReportAllocs()
+	users := benchUsers(200)
+	for i := 0; i < b.N; i++ {
+		var w countingWriter
+		if err := RenderBenchList(&w, "Bench", users); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -130,4 +193,13 @@ func BenchmarkGomponentsList(b *testing.B) {
 			b.Fatal(err)
 		}
 	}
+}
+
+type countingWriter struct {
+	n int
+}
+
+func (w *countingWriter) Write(p []byte) (int, error) {
+	w.n += len(p)
+	return len(p), nil
 }

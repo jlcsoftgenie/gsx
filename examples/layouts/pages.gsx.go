@@ -82,31 +82,41 @@ func RenderAuthLayoutWithSlots(w gsxio.Writer, slots GSXAuthLayoutSlots, title s
 }
 
 func renderAuthLayout(w gsxio.Writer, __gsx_slots GSXAuthLayoutSlots, title string) error {
-	if err := renderBaseLayout(w, GSXBaseLayoutSlots{
-		Head: __gsx_slots.Head,
-		Header: func(w gsxio.Writer) error {
-			if err := gsxrt.WriteString(w, "<div class=\"topbar\"><strong>Secure Area</strong></div>"); err != nil {
+	{
+		title := title
+		if err := gsxrt.WriteString(w, "<!doctype html><html><head><meta charset=\"utf-8\" /><title>"); err != nil {
+			return err
+		}
+		if err := gsxrt.WriteEscapedString(w, string(title)); err != nil {
+			return err
+		}
+		if err := gsxrt.WriteString(w, "</title>"); err != nil {
+			return err
+		}
+		if __gsx_slots.Head != nil {
+			if err := __gsx_slots.Head(w); err != nil {
 				return err
 			}
-			return nil
-		},
-		Default: func(w gsxio.Writer) error {
-			if err := gsxrt.WriteString(w, "<section class=\"auth-shell\">"); err != nil {
+		}
+		if err := gsxrt.WriteString(w, "</head><body><header><div class=\"topbar\"><strong>Secure Area</strong></div></header><main><section class=\"auth-shell\">"); err != nil {
+			return err
+		}
+		if __gsx_slots.Default != nil {
+			if err := __gsx_slots.Default(w); err != nil {
 				return err
 			}
-			if __gsx_slots.Default != nil {
-				if err := __gsx_slots.Default(w); err != nil {
-					return err
-				}
-			}
-			if err := gsxrt.WriteString(w, "</section>"); err != nil {
+		}
+		if err := gsxrt.WriteString(w, "</section></main><footer>"); err != nil {
+			return err
+		}
+		if __gsx_slots.Footer != nil {
+			if err := __gsx_slots.Footer(w); err != nil {
 				return err
 			}
-			return nil
-		},
-		Footer: __gsx_slots.Footer,
-	}, title); err != nil {
-		return err
+		}
+		if err := gsxrt.WriteString(w, "</footer></body></html>"); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -122,21 +132,23 @@ func RenderProfilePageWithSlots(w gsxio.Writer, slots GSXProfilePageSlots, data 
 }
 
 func renderProfilePage(w gsxio.Writer, __gsx_slots GSXProfilePageSlots, data ProfileData) error {
-	if err := renderAuthLayout(w, GSXAuthLayoutSlots{
-		Head: func(w gsxio.Writer) error {
-			if err := gsxrt.WriteString(w, "<meta name=\"description\""); err != nil {
+	{
+		title := data.Title
+		{
+			title := title
+			if err := gsxrt.WriteString(w, "<!doctype html><html><head><meta charset=\"utf-8\" /><title>"); err != nil {
+				return err
+			}
+			if err := gsxrt.WriteEscapedString(w, string(title)); err != nil {
+				return err
+			}
+			if err := gsxrt.WriteString(w, "</title><meta name=\"description\""); err != nil {
 				return err
 			}
 			if err := gsxrt.WriteAttrString(w, "content", string(data.Description)); err != nil {
 				return err
 			}
-			if err := gsxrt.WriteString(w, " />"); err != nil {
-				return err
-			}
-			return nil
-		},
-		Default: func(w gsxio.Writer) error {
-			if err := gsxrt.WriteString(w, "<section><h1>"); err != nil {
+			if err := gsxrt.WriteString(w, " /></head><body><header><div class=\"topbar\"><strong>Secure Area</strong></div></header><main><section class=\"auth-shell\"><section><h1>"); err != nil {
 				return err
 			}
 			if err := gsxrt.WriteEscapedString(w, string(data.Title)); err != nil {
@@ -160,25 +172,16 @@ func renderProfilePage(w gsxio.Writer, __gsx_slots GSXProfilePageSlots, data Pro
 			if err := gsxrt.WriteEscapedString(w, string(data.Role)); err != nil {
 				return err
 			}
-			if err := gsxrt.WriteString(w, "</dd></dl></section>"); err != nil {
-				return err
-			}
-			return nil
-		},
-		Footer: func(w gsxio.Writer) error {
-			if err := gsxrt.WriteString(w, "<div><small>Signed in as "); err != nil {
+			if err := gsxrt.WriteString(w, "</dd></dl></section></section></main><footer><div><small>Signed in as "); err != nil {
 				return err
 			}
 			if err := gsxrt.WriteEscapedString(w, string(data.Email)); err != nil {
 				return err
 			}
-			if err := gsxrt.WriteString(w, "</small></div>"); err != nil {
+			if err := gsxrt.WriteString(w, "</small></div></footer></body></html>"); err != nil {
 				return err
 			}
-			return nil
-		},
-	}, data.Title); err != nil {
-		return err
+		}
 	}
 	return nil
 }

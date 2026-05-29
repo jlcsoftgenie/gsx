@@ -63,24 +63,33 @@ func RenderPanelWithSlots(w gsxio.Writer, slots GSXPanelSlots, title string) err
 }
 
 func renderPanel(w gsxio.Writer, __gsx_slots GSXPanelSlots, title string) error {
-	if err := renderShell(w, GSXShellSlots{
-		Head: __gsx_slots.Head,
-		Default: func(w gsxio.Writer) error {
-			if err := gsxrt.WriteString(w, "<section class=\"panel-shell\">"); err != nil {
+	{
+		title := title
+		if err := gsxrt.WriteString(w, "<!doctype html><html><head><meta charset=\"utf-8\" /><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /><title>"); err != nil {
+			return err
+		}
+		if err := gsxrt.WriteEscapedString(w, string(title)); err != nil {
+			return err
+		}
+		if err := gsxrt.WriteString(w, "</title>"); err != nil {
+			return err
+		}
+		if __gsx_slots.Head != nil {
+			if err := __gsx_slots.Head(w); err != nil {
 				return err
 			}
-			if __gsx_slots.Default != nil {
-				if err := __gsx_slots.Default(w); err != nil {
-					return err
-				}
-			}
-			if err := gsxrt.WriteString(w, "</section>"); err != nil {
+		}
+		if err := gsxrt.WriteString(w, "</head><body><header class=\"site-header\"><strong>Shared Layouts</strong></header><main><section class=\"panel-shell\">"); err != nil {
+			return err
+		}
+		if __gsx_slots.Default != nil {
+			if err := __gsx_slots.Default(w); err != nil {
 				return err
 			}
-			return nil
-		},
-	}, title); err != nil {
-		return err
+		}
+		if err := gsxrt.WriteString(w, "</section></main></body></html>"); err != nil {
+			return err
+		}
 	}
 	return nil
 }

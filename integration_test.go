@@ -211,7 +211,7 @@ func TestCrossPackageRender(t *testing.T) {
 func moduleText(repoRoot string) string {
 	return `module example.com/integration
 
-go 1.23.0
+go 1.26.0
 
 require github.com/jlcsoftgenie/gsx v0.0.0
 

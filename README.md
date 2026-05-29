@@ -16,6 +16,8 @@ The compiler parses `.gsx` files, validates component calls and slot usage, and 
 
 ## Install
 
+GSX targets Go 1.26 or newer.
+
 Library module:
 
 ```bash
@@ -198,17 +200,17 @@ See [docs/publishing.md](docs/publishing.md) for the exact push/tag flow.
 
 ## Benchmarks
 
-Measured with `go test -bench=. -benchmem ./benchmarks` on Linux amd64, Intel i7-10700KF:
+Measured with `go test -bench=. -benchmem ./benchmarks` on Linux amd64, Intel(R) Core(TM) Ultra 9 275HX:
 
 | Benchmark | ns/op | B/op | allocs/op |
 | --- | ---: | ---: | ---: |
-| `BenchmarkGSXSimple` | 486.5 | 528 | 6 |
-| `BenchmarkHTMLTemplateSimple` | 2027 | 896 | 22 |
-| `BenchmarkGomponentsSimple` | 1748 | 1288 | 30 |
-| `BenchmarkGSXList` | 42191 | 39184 | 412 |
-| `BenchmarkGSXNestedLayouts` | 42117 | 39216 | 414 |
-| `BenchmarkHTMLTemplateList` | 370383 | 106869 | 3629 |
-| `BenchmarkGomponentsList` | 149412 | 112201 | 2437 |
+| `BenchmarkGSXSimple` | 143.9 | 496 | 4 |
+| `BenchmarkHTMLTemplateSimple` | 834.7 | 864 | 17 |
+| `BenchmarkGomponentsSimple` | 744.2 | 1288 | 30 |
+| `BenchmarkGSXList` | 10742 | 32752 | 10 |
+| `BenchmarkGSXNestedLayouts` | 11224 | 32752 | 10 |
+| `BenchmarkHTMLTemplateList` | 147580 | 84475 | 2424 |
+| `BenchmarkGomponentsList` | 67384 | 112200 | 2437 |
 
 See [docs/performance.md](docs/performance.md).
 

@@ -95,41 +95,73 @@ func RenderUsersPageWithSlots(w gsxio.Writer, slots GSXUsersPageSlots, title str
 }
 
 func renderUsersPage(w gsxio.Writer, __gsx_slots GSXUsersPageSlots, title string, users []User) error {
-	if err := renderAppLayout(w, GSXAppLayoutSlots{
-		Default: func(w gsxio.Writer) error {
-			if err := gsxrt.WriteString(w, "<main class=\"container\"><h1>"); err != nil {
+	{
+		title := title
+		if err := gsxrt.WriteString(w, "<!doctype html><html><head><meta charset=\"utf-8\" /><title>"); err != nil {
+			return err
+		}
+		if err := gsxrt.WriteEscapedString(w, string(title)); err != nil {
+			return err
+		}
+		if err := gsxrt.WriteString(w, "</title><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /></head><body><main class=\"container\"><h1>"); err != nil {
+			return err
+		}
+		if err := gsxrt.WriteEscapedString(w, string(title)); err != nil {
+			return err
+		}
+		if err := gsxrt.WriteString(w, "</h1>"); err != nil {
+			return err
+		}
+		if len(users) == 0 {
+			if err := gsxrt.WriteString(w, "<p>No users found.</p>"); err != nil {
 				return err
 			}
-			if err := gsxrt.WriteEscapedString(w, string(title)); err != nil {
+		} else {
+			if err := gsxrt.WriteString(w, "<ul class=\"users\">"); err != nil {
 				return err
 			}
-			if err := gsxrt.WriteString(w, "</h1>"); err != nil {
-				return err
-			}
-			if len(users) == 0 {
-				if err := gsxrt.WriteString(w, "<p>No users found.</p>"); err != nil {
-					return err
-				}
-			} else {
-				if err := gsxrt.WriteString(w, "<ul class=\"users\">"); err != nil {
-					return err
-				}
-				for _, user := range users {
-					if err := renderUserCard(w, GSXUserCardSlots{}, user); err != nil {
+			for _, user := range users {
+				{
+					user := user
+					if err := gsxrt.WriteString(w, "<li class=\"user-card\"><img"); err != nil {
+						return err
+					}
+					if err := gsxrt.WriteAttrString(w, "src", string(user.AvatarURL)); err != nil {
+						return err
+					}
+					if err := gsxrt.WriteAttrString(w, "alt", string(user.Name)); err != nil {
+						return err
+					}
+					if err := gsxrt.WriteString(w, " />"); err != nil {
+						return err
+					}
+					if err := gsxrt.WriteEscapedString(w, string(user.Name)); err != nil {
+						return err
+					}
+					if err := gsxrt.WriteString(w, "<div class=\"content\"><h3>"); err != nil {
+						return err
+					}
+					if err := gsxrt.WriteEscapedString(w, string(user.Name)); err != nil {
+						return err
+					}
+					if err := gsxrt.WriteString(w, "</h3><p>"); err != nil {
+						return err
+					}
+					if err := gsxrt.WriteEscapedString(w, string(user.Email)); err != nil {
+						return err
+					}
+					if err := gsxrt.WriteString(w, "</p></div></li>"); err != nil {
 						return err
 					}
 				}
-				if err := gsxrt.WriteString(w, "</ul>"); err != nil {
-					return err
-				}
 			}
-			if err := gsxrt.WriteString(w, "</main>"); err != nil {
+			if err := gsxrt.WriteString(w, "</ul>"); err != nil {
 				return err
 			}
-			return nil
-		},
-	}, title); err != nil {
-		return err
+		}
+		if err := gsxrt.WriteString(w, "</main></body></html>"); err != nil {
+			return err
+		}
 	}
 	return nil
 }

@@ -9,7 +9,7 @@ import (
 
 func TestComputePackageFingerprintsTrackImportedPackages(t *testing.T) {
 	tmp := t.TempDir()
-	writeTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/demo\n\ngo 1.23.0\n")
+	writeTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/demo\n\ngo 1.26.0\n")
 	writeTestFile(t, filepath.Join(tmp, "shared", "layout.gsx"), `package shared
 
 component Layout(title string) {
@@ -79,7 +79,7 @@ component Layout(title string) {
 
 func TestRunGenerateWritesCache(t *testing.T) {
 	tmp := t.TempDir()
-	writeTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/demo\n\ngo 1.23.0\n")
+	writeTestFile(t, filepath.Join(tmp, "go.mod"), "module example.com/demo\n\ngo 1.26.0\n")
 	writeTestFile(t, filepath.Join(tmp, "pages.gsx"), `package main
 
 component HomePage(title string) {

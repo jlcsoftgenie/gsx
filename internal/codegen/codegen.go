@@ -21,14 +21,16 @@ type importSpec struct {
 }
 
 type generator struct {
-	pkg     *compiler.Package
-	file    *ast.File
-	buf     bytes.Buffer
-	indent  int
-	ioAlias string
-	rtAlias string
-	curComp *compiler.Component
-	static  strings.Builder
+	pkg         *compiler.Package
+	file        *ast.File
+	buf         bytes.Buffer
+	indent      int
+	ioAlias     string
+	rtAlias     string
+	curComp     *compiler.Component
+	static      strings.Builder
+	slotScopes  []map[string][]ast.Node
+	inlineStack []string
 }
 
 func GenerateFile(pkg *compiler.Package, file *ast.File) ([]byte, error) {
@@ -206,22 +208,7 @@ func (g *generator) emitElement(elem *ast.Element, stripSlot bool) error {
 		return g.emitNodes(elem.Children, stripSlot, false)
 	}
 	if elem.Name == "slot" {
-		g.flushStatic()
-		name := "default"
-		if attr, ok := elem.Attr("name"); ok && attr.Kind == ast.AttrString && attr.Value != "" {
-			name = attr.Value
-		}
-		field := slotField(name)
-		g.line("if __gsx_slots.%s != nil {", field)
-		g.indent++
-		g.line("if err := __gsx_slots.%s(w); err != nil {", field)
-		g.indent++
-		g.line("return err")
-		g.indent--
-		g.line("}")
-		g.indent--
-		g.line("}")
-		return nil
+		return g.emitSlotOutlet(elem)
 	}
 	if elem.Name == "raw" {
 		g.flushStatic()
@@ -271,6 +258,9 @@ func (g *generator) emitElement(elem *ast.Element, stripSlot bool) error {
 }
 
 func (g *generator) emitComponentCall(resolved *compiler.ResolvedComponent, elem *ast.Element) error {
+	if g.canInlineComponentCall(resolved) {
+		return g.emitInlineComponentCall(resolved, elem)
+	}
 	g.flushStatic()
 	args := map[string]string{}
 	for _, attr := range elem.Attributes {
@@ -314,6 +304,81 @@ func (g *generator) emitComponentCall(resolved *compiler.ResolvedComponent, elem
 	g.line("}%s); err != nil {", callArgs(params))
 	g.indent++
 	g.line("return err")
+	g.indent--
+	g.line("}")
+	return nil
+}
+
+func (g *generator) emitSlotOutlet(elem *ast.Element) error {
+	name := "default"
+	if attr, ok := elem.Attr("name"); ok && attr.Kind == ast.AttrString && attr.Value != "" {
+		name = attr.Value
+	}
+	if len(g.slotScopes) > 0 {
+		scope := g.slotScopes[len(g.slotScopes)-1]
+		nodes, ok := scope[name]
+		if !ok || len(nodes) == 0 {
+			return nil
+		}
+		g.slotScopes = g.slotScopes[:len(g.slotScopes)-1]
+		err := g.emitNodes(nodes, true, false)
+		g.slotScopes = append(g.slotScopes, scope)
+		return err
+	}
+	g.flushStatic()
+	field := slotField(name)
+	g.line("if __gsx_slots.%s != nil {", field)
+	g.indent++
+	g.line("if err := __gsx_slots.%s(w); err != nil {", field)
+	g.indent++
+	g.line("return err")
+	g.indent--
+	g.line("}")
+	g.indent--
+	g.line("}")
+	return nil
+}
+
+func (g *generator) canInlineComponentCall(resolved *compiler.ResolvedComponent) bool {
+	if resolved == nil || resolved.External {
+		return false
+	}
+	name := resolved.Component.Decl.Name
+	if g.curComp != nil && g.curComp.Decl.Name == name {
+		return false
+	}
+	for _, active := range g.inlineStack {
+		if active == name {
+			return false
+		}
+	}
+	return true
+}
+
+func (g *generator) emitInlineComponentCall(resolved *compiler.ResolvedComponent, elem *ast.Element) error {
+	g.flushStatic()
+	args := map[string]string{}
+	for _, attr := range elem.Attributes {
+		if attr.MetaSlot {
+			continue
+		}
+		args[attr.Name] = propExpr(attr)
+	}
+	g.line("{")
+	g.indent++
+	for _, param := range resolved.Component.Params {
+		if args[param.Name] == param.Name {
+			continue
+		}
+		g.line("%s := %s", param.Name, args[param.Name])
+	}
+	g.slotScopes = append(g.slotScopes, groupSlots(elem.Children))
+	g.inlineStack = append(g.inlineStack, resolved.Component.Decl.Name)
+	if err := g.emitNodes(resolved.Component.Decl.Body, false, true); err != nil {
+		return err
+	}
+	g.inlineStack = g.inlineStack[:len(g.inlineStack)-1]
+	g.slotScopes = g.slotScopes[:len(g.slotScopes)-1]
 	g.indent--
 	g.line("}")
 	return nil
@@ -488,8 +553,10 @@ func (g *generator) writeString(s string) {
 
 func (g *generator) emitExprWrite(code string, span diagnostics.Span) {
 	switch g.pkg.ExprKind(span) {
-	case compiler.ValueKindString, compiler.ValueKindBytes:
+	case compiler.ValueKindString:
 		g.line("if err := %s.WriteEscapedString(w, string(%s)); err != nil {", g.rtAlias, code)
+	case compiler.ValueKindBytes:
+		g.line("if err := %s.WriteEscapedBytes(w, []byte(%s)); err != nil {", g.rtAlias, code)
 	case compiler.ValueKindBool:
 		g.line("if err := %s.WriteBool(w, bool(%s)); err != nil {", g.rtAlias, code)
 	case compiler.ValueKindInt:
@@ -510,8 +577,10 @@ func (g *generator) emitExprWrite(code string, span diagnostics.Span) {
 func (g *generator) emitAttrWrite(name, code string, span diagnostics.Span) {
 	boolean := isBooleanAttribute(name)
 	switch g.pkg.ExprKind(span) {
-	case compiler.ValueKindString, compiler.ValueKindBytes:
+	case compiler.ValueKindString:
 		g.line("if err := %s.WriteAttrString(w, %q, string(%s)); err != nil {", g.rtAlias, name, code)
+	case compiler.ValueKindBytes:
+		g.line("if err := %s.WriteAttrBytes(w, %q, []byte(%s)); err != nil {", g.rtAlias, name, code)
 	case compiler.ValueKindBool:
 		if boolean {
 			g.line("if err := %s.WriteBoolAttr(w, %q, bool(%s)); err != nil {", g.rtAlias, name, code)

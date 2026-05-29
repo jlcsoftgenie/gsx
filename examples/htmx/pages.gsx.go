@@ -91,8 +91,29 @@ func renderUsersTable(w gsxio.Writer, __gsx_slots GSXUsersTableSlots, users []Us
 		return err
 	}
 	for _, user := range users {
-		if err := renderUserRow(w, GSXUserRowSlots{}, user); err != nil {
-			return err
+		{
+			user := user
+			if err := gsxrt.WriteString(w, "<tr"); err != nil {
+				return err
+			}
+			if err := gsxrt.WriteAttrString(w, "id", string("user-"+strconv.Itoa(user.ID))); err != nil {
+				return err
+			}
+			if err := gsxrt.WriteString(w, "><td>"); err != nil {
+				return err
+			}
+			if err := gsxrt.WriteEscapedString(w, string(user.Name)); err != nil {
+				return err
+			}
+			if err := gsxrt.WriteString(w, "</td><td>"); err != nil {
+				return err
+			}
+			if err := gsxrt.WriteEscapedString(w, string(user.Email)); err != nil {
+				return err
+			}
+			if err := gsxrt.WriteString(w, "</td></tr>"); err != nil {
+				return err
+			}
 		}
 	}
 	if err := gsxrt.WriteString(w, "</tbody></table>"); err != nil {
@@ -112,21 +133,55 @@ func RenderUsersPageWithSlots(w gsxio.Writer, slots GSXUsersPageSlots, users []U
 }
 
 func renderUsersPage(w gsxio.Writer, __gsx_slots GSXUsersPageSlots, users []User) error {
-	if err := renderShell(w, GSXShellSlots{
-		Default: func(w gsxio.Writer) error {
-			if err := gsxrt.WriteString(w, "<main><h1>Users</h1><div hx-get=\"/users\" hx-trigger=\"load\" hx-swap=\"innerHTML\">"); err != nil {
+	{
+		title := "HTMX Users"
+		if err := gsxrt.WriteString(w, "<!doctype html><html><head><meta charset=\"utf-8\" /><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /><title>"); err != nil {
+			return err
+		}
+		if err := gsxrt.WriteEscapedString(w, string(title)); err != nil {
+			return err
+		}
+		if err := gsxrt.WriteString(w, "</title><script src=\"https://unpkg.com/htmx.org@1.9.12\"></script></head><body><main><h1>Users</h1><div hx-get=\"/users\" hx-trigger=\"load\" hx-swap=\"innerHTML\">"); err != nil {
+			return err
+		}
+		{
+			users := users
+			if err := gsxrt.WriteString(w, "<table class=\"users-table\"><thead><tr><th>Name</th><th>Email</th></tr></thead><tbody>"); err != nil {
 				return err
 			}
-			if err := renderUsersTable(w, GSXUsersTableSlots{}, users); err != nil {
+			for _, user := range users {
+				{
+					user := user
+					if err := gsxrt.WriteString(w, "<tr"); err != nil {
+						return err
+					}
+					if err := gsxrt.WriteAttrString(w, "id", string("user-"+strconv.Itoa(user.ID))); err != nil {
+						return err
+					}
+					if err := gsxrt.WriteString(w, "><td>"); err != nil {
+						return err
+					}
+					if err := gsxrt.WriteEscapedString(w, string(user.Name)); err != nil {
+						return err
+					}
+					if err := gsxrt.WriteString(w, "</td><td>"); err != nil {
+						return err
+					}
+					if err := gsxrt.WriteEscapedString(w, string(user.Email)); err != nil {
+						return err
+					}
+					if err := gsxrt.WriteString(w, "</td></tr>"); err != nil {
+						return err
+					}
+				}
+			}
+			if err := gsxrt.WriteString(w, "</tbody></table>"); err != nil {
 				return err
 			}
-			if err := gsxrt.WriteString(w, "</div></main>"); err != nil {
-				return err
-			}
-			return nil
-		},
-	}, "HTMX Users"); err != nil {
-		return err
+		}
+		if err := gsxrt.WriteString(w, "</div></main></body></html>"); err != nil {
+			return err
+		}
 	}
 	return nil
 }

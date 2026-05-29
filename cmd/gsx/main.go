@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	version    = "0.2.8"
+	version    = "0.3.0"
 	modulePath = "github.com/jlcsoftgenie/gsx"
 )
 
@@ -502,7 +502,7 @@ func hasGoMod(dir string) (bool, error) {
 
 func buildInitGoMod(appModulePath string) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "module %s\n\ngo 1.23.0\n", appModulePath)
+	fmt.Fprintf(&b, "module %s\n\ngo 1.26.0\n", appModulePath)
 	if replaceRoot, ok := localGSXReplaceRoot(); ok {
 		fmt.Fprintf(&b, "\nrequire %s v0.0.0\n\nreplace %s => %s\n", modulePath, modulePath, filepath.ToSlash(replaceRoot))
 	}

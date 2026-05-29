@@ -14,7 +14,7 @@ import (
 	"github.com/jlcsoftgenie/gsx/internal/project"
 )
 
-const generationCacheSalt = "gsx-generate-cache-v1"
+const generationCacheSalt = "gsx-generate-cache-v2"
 
 type generateCache struct {
 	Version  int                          `json:"version"`
@@ -205,6 +205,8 @@ func computePackageFingerprints(pkgs []*compiler.Package) map[string]string {
 		visiting[pkg.Dir] = true
 		h := sha256.New()
 		h.Write([]byte(generationCacheSalt))
+		h.Write([]byte{0})
+		h.Write([]byte(version))
 		h.Write([]byte{0})
 		h.Write([]byte(pkg.Dir))
 		h.Write([]byte{0})

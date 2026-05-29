@@ -89,35 +89,46 @@ func RenderDashboardPageWithSlots(w gsxio.Writer, slots GSXDashboardPageSlots, d
 }
 
 func renderDashboardPage(w gsxio.Writer, __gsx_slots GSXDashboardPageSlots, data DashboardData) error {
-	if err := renderDashboardLayout(w, GSXDashboardLayoutSlots{
-		Head: func(w gsxio.Writer) error {
-			if err := gsxrt.WriteString(w, "<meta name=\"description\" content=\"Example admin dashboard rendered with GSX\" />"); err != nil {
-				return err
-			}
-			return nil
-		},
-		Default: func(w gsxio.Writer) error {
-			if err := gsxrt.WriteString(w, "<header><h1>"); err != nil {
-				return err
-			}
-			if err := gsxrt.WriteEscapedString(w, string(data.Title)); err != nil {
-				return err
-			}
-			if err := gsxrt.WriteString(w, "</h1><form method=\"post\" action=\"/filters\"><label for=\"range\">Time range</label><select id=\"range\" name=\"range\"><option value=\"24h\">Last 24 hours</option><option value=\"7d\">Last 7 days</option><option value=\"30d\">Last 30 days</option></select><button type=\"submit\">Apply</button></form></header><section class=\"metrics-grid\">"); err != nil {
-				return err
-			}
-			for _, metric := range data.Metrics {
-				if err := renderMetricCard(w, GSXMetricCardSlots{}, metric); err != nil {
+	{
+		title := data.Title
+		if err := gsxrt.WriteString(w, "<!doctype html><html><head><meta charset=\"utf-8\" /><title>"); err != nil {
+			return err
+		}
+		if err := gsxrt.WriteEscapedString(w, string(title)); err != nil {
+			return err
+		}
+		if err := gsxrt.WriteString(w, "</title><meta name=\"description\" content=\"Example admin dashboard rendered with GSX\" /></head><body><aside class=\"sidebar\"><nav><a href=\"/\">Overview</a><a href=\"/users\">Users</a><a href=\"/jobs\">Jobs</a></nav></aside><section class=\"content\"><header><h1>"); err != nil {
+			return err
+		}
+		if err := gsxrt.WriteEscapedString(w, string(data.Title)); err != nil {
+			return err
+		}
+		if err := gsxrt.WriteString(w, "</h1><form method=\"post\" action=\"/filters\"><label for=\"range\">Time range</label><select id=\"range\" name=\"range\"><option value=\"24h\">Last 24 hours</option><option value=\"7d\">Last 7 days</option><option value=\"30d\">Last 30 days</option></select><button type=\"submit\">Apply</button></form></header><section class=\"metrics-grid\">"); err != nil {
+			return err
+		}
+		for _, metric := range data.Metrics {
+			{
+				metric := metric
+				if err := gsxrt.WriteString(w, "<article class=\"metric-card\"><h2>"); err != nil {
+					return err
+				}
+				if err := gsxrt.WriteEscapedString(w, string(metric.Value)); err != nil {
+					return err
+				}
+				if err := gsxrt.WriteString(w, "</h2><p>"); err != nil {
+					return err
+				}
+				if err := gsxrt.WriteEscapedString(w, string(metric.Label)); err != nil {
+					return err
+				}
+				if err := gsxrt.WriteString(w, "</p></article>"); err != nil {
 					return err
 				}
 			}
-			if err := gsxrt.WriteString(w, "</section>"); err != nil {
-				return err
-			}
-			return nil
-		},
-	}, data.Title); err != nil {
-		return err
+		}
+		if err := gsxrt.WriteString(w, "</section></section></body></html>"); err != nil {
+			return err
+		}
 	}
 	return nil
 }

@@ -93,7 +93,7 @@ func (p *printer) printNode(node ast.Node) {
 			if trimmed == "" {
 				continue
 			}
-			p.line(trimmed)
+			p.line("%s", trimmed)
 		}
 	case *ast.Expr:
 		p.line("{%s}", strings.TrimSpace(n.Code))
@@ -150,7 +150,7 @@ func (p *printer) printElement(elem *ast.Element) {
 		p.line("<%s", elem.Name)
 		p.indent++
 		for _, attr := range elem.Attributes {
-			p.line(p.renderAttr(attr))
+			p.line("%s", p.renderAttr(attr))
 		}
 		p.indent--
 		p.line("/>")

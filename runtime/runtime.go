@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 	"sync"
+	"unsafe"
 )
 
 type HTML string
@@ -13,12 +15,16 @@ type HTML string
 var bufferPool = sync.Pool{New: func() any { return new(bytes.Buffer) }}
 
 func WriteString(w io.Writer, s string) error {
-	_, err := io.WriteString(w, s)
+	_, err := writeString(w, s)
 	return err
 }
 
 func WriteEscapedString(w io.Writer, s string) error {
 	return writeEscapedString(w, s)
+}
+
+func WriteEscapedBytes(w io.Writer, b []byte) error {
+	return writeEscapedBytes(w, b)
 }
 
 func WriteBool(w io.Writer, v bool) error {
@@ -54,7 +60,7 @@ func WriteEscaped(w io.Writer, v any) error {
 	case string:
 		return WriteEscapedString(w, x)
 	case []byte:
-		return WriteEscapedString(w, string(x))
+		return WriteEscapedBytes(w, x)
 	case HTML:
 		return WriteEscapedString(w, string(x))
 	case fmt.Stringer:
@@ -97,6 +103,19 @@ func WriteAttrString(w io.Writer, name string, v string) error {
 		return err
 	}
 	if err := WriteEscapedString(w, v); err != nil {
+		return err
+	}
+	return writeAttrSuffix(w)
+}
+
+func WriteAttrBytes(w io.Writer, name string, v []byte) error {
+	if len(v) == 0 {
+		return nil
+	}
+	if err := writeAttrPrefix(w, name); err != nil {
+		return err
+	}
+	if err := WriteEscapedBytes(w, v); err != nil {
 		return err
 	}
 	return writeAttrSuffix(w)
@@ -165,7 +184,7 @@ func WriteAttr(w io.Writer, name string, v any, boolean bool) error {
 	case string:
 		return WriteAttrString(w, name, x)
 	case []byte:
-		return WriteAttrString(w, name, string(x))
+		return WriteAttrBytes(w, name, x)
 	case HTML:
 		return WriteAttrString(w, name, string(x))
 	case fmt.Stringer:
@@ -201,8 +220,7 @@ func WriteAttr(w io.Writer, name string, v any, boolean bool) error {
 }
 
 func WriteRaw(w io.Writer, v HTML) error {
-	_, err := io.WriteString(w, string(v))
-	return err
+	return WriteString(w, string(v))
 }
 
 func RenderString(fn func(io.Writer) error) (string, error) {
@@ -216,8 +234,13 @@ func RenderString(fn func(io.Writer) error) (string, error) {
 }
 
 func writeEscapedString(w io.Writer, s string) error {
+	first := strings.IndexAny(s, "&<>\"'")
+	if first < 0 {
+		_, err := writeString(w, s)
+		return err
+	}
 	last := 0
-	for i := 0; i < len(s); i++ {
+	for i := first; i < len(s); i++ {
 		repl := ""
 		switch s[i] {
 		case '&':
@@ -235,17 +258,58 @@ func writeEscapedString(w io.Writer, s string) error {
 			continue
 		}
 		if last < i {
-			if _, err := io.WriteString(w, s[last:i]); err != nil {
+			if _, err := writeString(w, s[last:i]); err != nil {
 				return err
 			}
 		}
-		if _, err := io.WriteString(w, repl); err != nil {
+		if _, err := writeString(w, repl); err != nil {
 			return err
 		}
 		last = i + 1
 	}
 	if last < len(s) {
-		_, err := io.WriteString(w, s[last:])
+		_, err := writeString(w, s[last:])
+		return err
+	}
+	return nil
+}
+
+func writeEscapedBytes(w io.Writer, b []byte) error {
+	first := bytes.IndexAny(b, "&<>\"'")
+	if first < 0 {
+		_, err := w.Write(b)
+		return err
+	}
+	last := 0
+	for i := first; i < len(b); i++ {
+		repl := ""
+		switch b[i] {
+		case '&':
+			repl = "&amp;"
+		case '<':
+			repl = "&lt;"
+		case '>':
+			repl = "&gt;"
+		case '"':
+			repl = "&#34;"
+		case '\'':
+			repl = "&#39;"
+		}
+		if repl == "" {
+			continue
+		}
+		if last < i {
+			if _, err := w.Write(b[last:i]); err != nil {
+				return err
+			}
+		}
+		if _, err := writeString(w, repl); err != nil {
+			return err
+		}
+		last = i + 1
+	}
+	if last < len(b) {
+		_, err := w.Write(b[last:])
 		return err
 	}
 	return nil
@@ -263,6 +327,17 @@ func writeAttrPrefix(w io.Writer, name string) error {
 
 func writeAttrSuffix(w io.Writer) error {
 	return WriteString(w, `"`)
+}
+
+func writeString(w io.Writer, s string) (int, error) {
+	if sw, ok := w.(io.StringWriter); ok {
+		return sw.WriteString(s)
+	}
+	if s == "" {
+		return 0, nil
+	}
+	// io.Writer implementations must not mutate p, so this avoids the []byte(s) allocation.
+	return w.Write(unsafe.Slice(unsafe.StringData(s), len(s)))
 }
 
 func stringify(v any) (string, bool) {

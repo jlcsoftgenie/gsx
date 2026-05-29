@@ -2,7 +2,7 @@
   "name": "gsx-language-tools",
   "displayName": "GSX Language Tools",
   "description": "Syntax highlighting, snippets, hover, formatting, diagnostics, and language-server completions for GSX templates.",
-  "version": "0.2.8",
+  "version": "0.3.0",
   "publisher": "jlcsoftgenie",
   "license": "MIT",
   "repository": {

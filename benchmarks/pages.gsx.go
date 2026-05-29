@@ -80,21 +80,23 @@ func RenderBenchSimpleWithSlots(w gsxio.Writer, slots GSXBenchSimpleSlots, title
 }
 
 func renderBenchSimple(w gsxio.Writer, __gsx_slots GSXBenchSimpleSlots, title string) error {
-	if err := renderBenchLayout(w, GSXBenchLayoutSlots{
-		Default: func(w gsxio.Writer) error {
-			if err := gsxrt.WriteString(w, "<main><h1>"); err != nil {
-				return err
-			}
-			if err := gsxrt.WriteEscapedString(w, string(title)); err != nil {
-				return err
-			}
-			if err := gsxrt.WriteString(w, "</h1><p>Fast, compiled HTML rendering.</p></main>"); err != nil {
-				return err
-			}
-			return nil
-		},
-	}, title); err != nil {
-		return err
+	{
+		title := title
+		if err := gsxrt.WriteString(w, "<!doctype html><html><head><meta charset=\"utf-8\" /><title>"); err != nil {
+			return err
+		}
+		if err := gsxrt.WriteEscapedString(w, string(title)); err != nil {
+			return err
+		}
+		if err := gsxrt.WriteString(w, "</title></head><body><main><h1>"); err != nil {
+			return err
+		}
+		if err := gsxrt.WriteEscapedString(w, string(title)); err != nil {
+			return err
+		}
+		if err := gsxrt.WriteString(w, "</h1><p>Fast, compiled HTML rendering.</p></main></body></html>"); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -155,24 +157,33 @@ func RenderBenchShellLayoutWithSlots(w gsxio.Writer, slots GSXBenchShellLayoutSl
 }
 
 func renderBenchShellLayout(w gsxio.Writer, __gsx_slots GSXBenchShellLayoutSlots, title string) error {
-	if err := renderBenchBaseLayout(w, GSXBenchBaseLayoutSlots{
-		Head: __gsx_slots.Head,
-		Default: func(w gsxio.Writer) error {
-			if err := gsxrt.WriteString(w, "<section class=\"shell\">"); err != nil {
+	{
+		title := title
+		if err := gsxrt.WriteString(w, "<!doctype html><html><head><meta charset=\"utf-8\" /><title>"); err != nil {
+			return err
+		}
+		if err := gsxrt.WriteEscapedString(w, string(title)); err != nil {
+			return err
+		}
+		if err := gsxrt.WriteString(w, "</title>"); err != nil {
+			return err
+		}
+		if __gsx_slots.Head != nil {
+			if err := __gsx_slots.Head(w); err != nil {
 				return err
 			}
-			if __gsx_slots.Default != nil {
-				if err := __gsx_slots.Default(w); err != nil {
-					return err
-				}
-			}
-			if err := gsxrt.WriteString(w, "</section>"); err != nil {
+		}
+		if err := gsxrt.WriteString(w, "</head><body><section class=\"shell\">"); err != nil {
+			return err
+		}
+		if __gsx_slots.Default != nil {
+			if err := __gsx_slots.Default(w); err != nil {
 				return err
 			}
-			return nil
-		},
-	}, title); err != nil {
-		return err
+		}
+		if err := gsxrt.WriteString(w, "</section></body></html>"); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -188,29 +199,46 @@ func RenderBenchListWithSlots(w gsxio.Writer, slots GSXBenchListSlots, title str
 }
 
 func renderBenchList(w gsxio.Writer, __gsx_slots GSXBenchListSlots, title string, users []User) error {
-	if err := renderBenchLayout(w, GSXBenchLayoutSlots{
-		Default: func(w gsxio.Writer) error {
-			if err := gsxrt.WriteString(w, "<main><h1>"); err != nil {
-				return err
-			}
-			if err := gsxrt.WriteEscapedString(w, string(title)); err != nil {
-				return err
-			}
-			if err := gsxrt.WriteString(w, "</h1><ul>"); err != nil {
-				return err
-			}
-			for _, user := range users {
-				if err := renderBenchUserRow(w, GSXBenchUserRowSlots{}, user); err != nil {
+	{
+		title := title
+		if err := gsxrt.WriteString(w, "<!doctype html><html><head><meta charset=\"utf-8\" /><title>"); err != nil {
+			return err
+		}
+		if err := gsxrt.WriteEscapedString(w, string(title)); err != nil {
+			return err
+		}
+		if err := gsxrt.WriteString(w, "</title></head><body><main><h1>"); err != nil {
+			return err
+		}
+		if err := gsxrt.WriteEscapedString(w, string(title)); err != nil {
+			return err
+		}
+		if err := gsxrt.WriteString(w, "</h1><ul>"); err != nil {
+			return err
+		}
+		for _, user := range users {
+			{
+				user := user
+				if err := gsxrt.WriteString(w, "<li class=\"user-row\"><strong>"); err != nil {
+					return err
+				}
+				if err := gsxrt.WriteEscapedString(w, string(user.Name)); err != nil {
+					return err
+				}
+				if err := gsxrt.WriteString(w, "</strong><span>"); err != nil {
+					return err
+				}
+				if err := gsxrt.WriteEscapedString(w, string(user.Email)); err != nil {
+					return err
+				}
+				if err := gsxrt.WriteString(w, "</span></li>"); err != nil {
 					return err
 				}
 			}
-			if err := gsxrt.WriteString(w, "</ul></main>"); err != nil {
-				return err
-			}
-			return nil
-		},
-	}, title); err != nil {
-		return err
+		}
+		if err := gsxrt.WriteString(w, "</ul></main></body></html>"); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -226,21 +254,23 @@ func RenderBenchNestedLayoutsWithSlots(w gsxio.Writer, slots GSXBenchNestedLayou
 }
 
 func renderBenchNestedLayouts(w gsxio.Writer, __gsx_slots GSXBenchNestedLayoutsSlots, title string, users []User) error {
-	if err := renderBenchShellLayout(w, GSXBenchShellLayoutSlots{
-		Head: func(w gsxio.Writer) error {
-			if err := gsxrt.WriteString(w, "<meta name=\"description\""); err != nil {
+	{
+		title := title
+		{
+			title := title
+			if err := gsxrt.WriteString(w, "<!doctype html><html><head><meta charset=\"utf-8\" /><title>"); err != nil {
+				return err
+			}
+			if err := gsxrt.WriteEscapedString(w, string(title)); err != nil {
+				return err
+			}
+			if err := gsxrt.WriteString(w, "</title><meta name=\"description\""); err != nil {
 				return err
 			}
 			if err := gsxrt.WriteAttrString(w, "content", string(title)); err != nil {
 				return err
 			}
-			if err := gsxrt.WriteString(w, " />"); err != nil {
-				return err
-			}
-			return nil
-		},
-		Default: func(w gsxio.Writer) error {
-			if err := gsxrt.WriteString(w, "<main><h1>"); err != nil {
+			if err := gsxrt.WriteString(w, " /></head><body><section class=\"shell\"><main><h1>"); err != nil {
 				return err
 			}
 			if err := gsxrt.WriteEscapedString(w, string(title)); err != nil {
@@ -250,17 +280,29 @@ func renderBenchNestedLayouts(w gsxio.Writer, __gsx_slots GSXBenchNestedLayoutsS
 				return err
 			}
 			for _, user := range users {
-				if err := renderBenchUserRow(w, GSXBenchUserRowSlots{}, user); err != nil {
-					return err
+				{
+					user := user
+					if err := gsxrt.WriteString(w, "<li class=\"user-row\"><strong>"); err != nil {
+						return err
+					}
+					if err := gsxrt.WriteEscapedString(w, string(user.Name)); err != nil {
+						return err
+					}
+					if err := gsxrt.WriteString(w, "</strong><span>"); err != nil {
+						return err
+					}
+					if err := gsxrt.WriteEscapedString(w, string(user.Email)); err != nil {
+						return err
+					}
+					if err := gsxrt.WriteString(w, "</span></li>"); err != nil {
+						return err
+					}
 				}
 			}
-			if err := gsxrt.WriteString(w, "</ul></main>"); err != nil {
+			if err := gsxrt.WriteString(w, "</ul></main></section></body></html>"); err != nil {
 				return err
 			}
-			return nil
-		},
-	}, title); err != nil {
-		return err
+		}
 	}
 	return nil
 }
