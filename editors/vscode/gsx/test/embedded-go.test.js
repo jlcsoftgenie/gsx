@@ -59,6 +59,15 @@ function findGoplsCommand() {
   return undefined;
 }
 
+function requireGopls(t) {
+  const goplsCommand = findGoplsCommand();
+  if (goplsCommand !== undefined) {
+    return goplsCommand;
+  }
+  t.skip('gopls not available');
+  return undefined;
+}
+
 test('embedded Go probe includes params and inferred loop bindings', async () => {
   const document = documentFor('examples/admin/pages.gsx');
   const text = document.getText();
@@ -97,9 +106,9 @@ component Page(users []User) {
 });
 
 test('gopls-backed hover and completion work inside single-line GSX expressions when gopls is available', async (t) => {
-  const goplsCommand = findGoplsCommand();
+  const goplsCommand = requireGopls(t);
   if (goplsCommand === undefined) {
-    t.skip('gopls not available');
+    return;
   }
 
   const document = documentFor('examples/admin/pages.gsx');
@@ -116,9 +125,9 @@ test('gopls-backed hover and completion work inside single-line GSX expressions 
 });
 
 test('embedded Go definition resolves local declarations back to the GSX file when gopls is available', async (t) => {
-  const goplsCommand = findGoplsCommand();
+  const goplsCommand = requireGopls(t);
   if (goplsCommand === undefined) {
-    t.skip('gopls not available');
+    return;
   }
 
   const document = inlineDocument('examples/basic/__embedded_definition.gsx', `package main
@@ -137,9 +146,9 @@ component Page(users []User) {
 });
 
 test('embedded Go diagnostics map back to GSX lines when gopls is available', async (t) => {
-  const goplsCommand = findGoplsCommand();
+  const goplsCommand = requireGopls(t);
   if (goplsCommand === undefined) {
-    t.skip('gopls not available');
+    return;
   }
 
   const document = inlineDocument('examples/basic/__embedded_diagnostics.gsx', `package main
@@ -156,9 +165,9 @@ component Page(users []User) {
 });
 
 test('local declaration references and rename work through the embedded Go overlay when gopls is available', async (t) => {
-  const goplsCommand = findGoplsCommand();
+  const goplsCommand = requireGopls(t);
   if (goplsCommand === undefined) {
-    t.skip('gopls not available');
+    return;
   }
 
   const document = inlineDocument('examples/basic/__embedded_refs.gsx', `package main
