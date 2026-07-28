@@ -41,7 +41,7 @@ component Home(title string) {
 		t.Fatal(err)
 	}
 	text := string(out)
-	for _, want := range []string{"func RenderLayout", "type GSXLayoutSlots struct", "func RenderLayoutWithSlots", "return renderHome", "WriteEscaped"} {
+	for _, want := range []string{"func RenderLayout", "func RenderLayoutBuffer", "type GSXLayoutSlots struct", "func RenderLayoutWithSlots", "func RenderLayoutBufferWithSlots", "return renderHome", "WriteEscaped", `"bytes"`} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("generated output missing %q\n%s", want, text)
 		}
@@ -141,6 +141,7 @@ component Shell(title string) {
 		`<section class=\"shell\">`,
 		"__gsx_slots.Head",
 		"__gsx_slots.Default",
+		"__gsx_buf.Grow(",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("generated output missing %q\n%s", want, text)
@@ -154,6 +155,38 @@ component Shell(title string) {
 		if strings.Contains(text, notWant) {
 			t.Fatalf("generated output should not contain %q\n%s", notWant, text)
 		}
+	}
+}
+
+func TestGenerateFileUsesParameterRangeInBufferHint(t *testing.T) {
+	src := `package pages
+
+component UserRow(name string) {
+  <li>{name}</li>
+}
+
+component Users(names []string) {
+  <ul>
+    for _, name := range names {
+      <UserRow name={name} />
+    }
+  </ul>
+}
+`
+	file, diags := parser.ParseFile("pages.gsx", src)
+	if len(diags) > 0 {
+		t.Fatalf("parse diagnostics: %+v", diags)
+	}
+	pkg, diags := compiler.CompilePackage(".", []*ast.File{file})
+	if len(diags) > 0 {
+		t.Fatalf("compile diagnostics: %+v", diags)
+	}
+	out, err := GenerateFile(pkg, file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(out), "len(names)*") {
+		t.Fatalf("generated output missing parameter range buffer hint\n%s", out)
 	}
 }
 

@@ -3,6 +3,7 @@
 package main
 
 import (
+	gsxbytes "bytes"
 	gsxrt "github.com/jlcsoftgenie/gsx/runtime"
 	gsxio "io"
 )
@@ -15,8 +16,18 @@ func RenderAppLayout(w gsxio.Writer, title string) error {
 	return renderAppLayout(w, GSXAppLayoutSlots{}, title)
 }
 
+func RenderAppLayoutBuffer(__gsx_buf *gsxbytes.Buffer, title string) error {
+	__gsx_buf.Grow(195)
+	return renderAppLayout(__gsx_buf, GSXAppLayoutSlots{}, title)
+}
+
 func RenderAppLayoutWithSlots(w gsxio.Writer, slots GSXAppLayoutSlots, title string) error {
 	return renderAppLayout(w, slots, title)
+}
+
+func RenderAppLayoutBufferWithSlots(__gsx_buf *gsxbytes.Buffer, slots GSXAppLayoutSlots, title string) error {
+	__gsx_buf.Grow(195)
+	return renderAppLayout(__gsx_buf, slots, title)
 }
 
 func renderAppLayout(w gsxio.Writer, __gsx_slots GSXAppLayoutSlots, title string) error {
@@ -46,8 +57,18 @@ func RenderUserCard(w gsxio.Writer, user User) error {
 	return renderUserCard(w, GSXUserCardSlots{}, user)
 }
 
+func RenderUserCardBuffer(__gsx_buf *gsxbytes.Buffer, user User) error {
+	__gsx_buf.Grow(251)
+	return renderUserCard(__gsx_buf, GSXUserCardSlots{}, user)
+}
+
 func RenderUserCardWithSlots(w gsxio.Writer, slots GSXUserCardSlots, user User) error {
 	return renderUserCard(w, slots, user)
+}
+
+func RenderUserCardBufferWithSlots(__gsx_buf *gsxbytes.Buffer, slots GSXUserCardSlots, user User) error {
+	__gsx_buf.Grow(251)
+	return renderUserCard(__gsx_buf, slots, user)
 }
 
 func renderUserCard(w gsxio.Writer, __gsx_slots GSXUserCardSlots, user User) error {
@@ -90,13 +111,22 @@ func RenderUsersPage(w gsxio.Writer, title string, users []User) error {
 	return renderUsersPage(w, GSXUsersPageSlots{}, title, users)
 }
 
+func RenderUsersPageBuffer(__gsx_buf *gsxbytes.Buffer, title string, users []User) error {
+	__gsx_buf.Grow(541 + len(users)*251)
+	return renderUsersPage(__gsx_buf, GSXUsersPageSlots{}, title, users)
+}
+
 func RenderUsersPageWithSlots(w gsxio.Writer, slots GSXUsersPageSlots, title string, users []User) error {
 	return renderUsersPage(w, slots, title, users)
 }
 
+func RenderUsersPageBufferWithSlots(__gsx_buf *gsxbytes.Buffer, slots GSXUsersPageSlots, title string, users []User) error {
+	__gsx_buf.Grow(541 + len(users)*251)
+	return renderUsersPage(__gsx_buf, slots, title, users)
+}
+
 func renderUsersPage(w gsxio.Writer, __gsx_slots GSXUsersPageSlots, title string, users []User) error {
 	{
-		title := title
 		if err := gsxrt.WriteString(w, "<!doctype html><html><head><meta charset=\"utf-8\" /><title>"); err != nil {
 			return err
 		}
@@ -122,7 +152,6 @@ func renderUsersPage(w gsxio.Writer, __gsx_slots GSXUsersPageSlots, title string
 			}
 			for _, user := range users {
 				{
-					user := user
 					if err := gsxrt.WriteString(w, "<li class=\"user-card\"><img"); err != nil {
 						return err
 					}

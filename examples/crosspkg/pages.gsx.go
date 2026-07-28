@@ -3,6 +3,7 @@
 package main
 
 import (
+	gsxbytes "bytes"
 	shared "github.com/jlcsoftgenie/gsx/examples/shared/layouts"
 	gsxrt "github.com/jlcsoftgenie/gsx/runtime"
 	gsxio "io"
@@ -14,8 +15,18 @@ func RenderHomePage(w gsxio.Writer, title string, description string) error {
 	return renderHomePage(w, GSXHomePageSlots{}, title, description)
 }
 
+func RenderHomePageBuffer(__gsx_buf *gsxbytes.Buffer, title string, description string) error {
+	__gsx_buf.Grow(0)
+	return renderHomePage(__gsx_buf, GSXHomePageSlots{}, title, description)
+}
+
 func RenderHomePageWithSlots(w gsxio.Writer, slots GSXHomePageSlots, title string, description string) error {
 	return renderHomePage(w, slots, title, description)
+}
+
+func RenderHomePageBufferWithSlots(__gsx_buf *gsxbytes.Buffer, slots GSXHomePageSlots, title string, description string) error {
+	__gsx_buf.Grow(0)
+	return renderHomePage(__gsx_buf, slots, title, description)
 }
 
 func renderHomePage(w gsxio.Writer, __gsx_slots GSXHomePageSlots, title string, description string) error {

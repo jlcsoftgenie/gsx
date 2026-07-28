@@ -25,6 +25,7 @@ type generator struct {
 	file        *ast.File
 	buf         bytes.Buffer
 	indent      int
+	bytesAlias  string
 	ioAlias     string
 	rtAlias     string
 	curComp     *compiler.Component
@@ -34,7 +35,7 @@ type generator struct {
 }
 
 func GenerateFile(pkg *compiler.Package, file *ast.File) ([]byte, error) {
-	g := &generator{pkg: pkg, file: file, ioAlias: "gsxio", rtAlias: "gsxrt"}
+	g := &generator{pkg: pkg, file: file, bytesAlias: "gsxbytes", ioAlias: "gsxio", rtAlias: "gsxrt"}
 	if err := g.generate(); err != nil {
 		return nil, err
 	}
@@ -77,9 +78,23 @@ func (g *generator) generate() error {
 		g.indent--
 		g.line("}")
 		g.line("")
+		g.line("func Render%sBuffer(__gsx_buf *%s.Buffer%s) error {", decl.Name, g.bytesAlias, g.paramSignature(comp.Params))
+		g.indent++
+		g.line("__gsx_buf.Grow(%s)", g.bufferSizeHint(comp))
+		g.line("return render%s(__gsx_buf, %s{}, %s)", decl.Name, slotTypeName(decl.Name), g.paramNames(comp.Params))
+		g.indent--
+		g.line("}")
+		g.line("")
 		g.line("func Render%sWithSlots(w %s.Writer, slots %s%s) error {", decl.Name, g.ioAlias, slotTypeName(decl.Name), g.paramSignature(comp.Params))
 		g.indent++
 		g.line("return render%s(w, slots, %s)", decl.Name, g.paramNames(comp.Params))
+		g.indent--
+		g.line("}")
+		g.line("")
+		g.line("func Render%sBufferWithSlots(__gsx_buf *%s.Buffer, slots %s%s) error {", decl.Name, g.bytesAlias, slotTypeName(decl.Name), g.paramSignature(comp.Params))
+		g.indent++
+		g.line("__gsx_buf.Grow(%s)", g.bufferSizeHint(comp))
+		g.line("return render%s(__gsx_buf, slots, %s)", decl.Name, g.paramNames(comp.Params))
 		g.indent--
 		g.line("}")
 		g.line("")
@@ -107,6 +122,7 @@ func (g *generator) collectImports() ([]importSpec, error) {
 		}
 		byPath[imp.Path] = importSpec{Alias: alias, Path: imp.Path}
 	}
+	g.bytesAlias = ensureImport(byPath, "bytes", g.bytesAlias)
 	g.ioAlias = ensureImport(byPath, "io", g.ioAlias)
 	g.rtAlias = ensureImport(byPath, "github.com/jlcsoftgenie/gsx/runtime", g.rtAlias)
 	out := make([]importSpec, 0, len(byPath))
@@ -307,6 +323,194 @@ func (g *generator) emitComponentCall(resolved *compiler.ResolvedComponent, elem
 	g.indent--
 	g.line("}")
 	return nil
+}
+
+const bufferExpressionHint = 32
+
+type bufferHintTerm struct {
+	collection string
+	perItem    int
+}
+
+func (g *generator) bufferSizeHint(comp *compiler.Component) string {
+	if comp == nil {
+		return "0"
+	}
+	parts := []string{strconv.Itoa(g.staticSize(comp))}
+	for _, term := range g.rangeHintTerms(comp.Decl.Body, comp.ParamBy) {
+		parts = append(parts, fmt.Sprintf("len(%s)*%d", term.collection, term.perItem))
+	}
+	return strings.Join(parts, " + ")
+}
+
+func (g *generator) staticSize(comp *compiler.Component) int {
+	if comp == nil {
+		return 0
+	}
+	return g.estimateNodes(comp.Decl.Body, nil, map[string]bool{comp.Decl.Name: true})
+}
+
+// rangeHintTerms only uses parameter-rooted range expressions. That keeps the
+// generated len calls in scope and avoids evaluating arbitrary user expressions twice.
+func (g *generator) rangeHintTerms(nodes []ast.Node, params map[string]ast.Param) []bufferHintTerm {
+	var terms []bufferHintTerm
+	var visit func([]ast.Node)
+	visit = func(items []ast.Node) {
+		for _, node := range items {
+			switch n := node.(type) {
+			case *ast.For:
+				collection, ok := rangeCollection(n.Header, params)
+				if !ok {
+					continue
+				}
+				perItem := g.estimateNodes(n.Body, nil, map[string]bool{})
+				if perItem > 0 {
+					terms = append(terms, bufferHintTerm{collection: collection, perItem: perItem})
+				}
+			case *ast.If:
+				for _, branch := range n.Branches {
+					visit(branch.Body)
+				}
+				visit(n.ElseBody)
+			case *ast.Element:
+				visit(n.Children)
+			}
+		}
+	}
+	visit(nodes)
+	return terms
+}
+
+func rangeCollection(header string, params map[string]ast.Param) (string, bool) {
+	index := strings.LastIndex(header, "range")
+	if index < 0 {
+		return "", false
+	}
+	collection := strings.TrimSpace(header[index+len("range"):])
+	if !isSimpleSelector(collection) {
+		return "", false
+	}
+	root, _, _ := strings.Cut(collection, ".")
+	if _, ok := params[root]; !ok {
+		return "", false
+	}
+	return collection, true
+}
+
+func isSimpleSelector(expr string) bool {
+	parts := strings.Split(expr, ".")
+	if len(parts) == 0 {
+		return false
+	}
+	for _, part := range parts {
+		if !isASCIIIdentifier(part) {
+			return false
+		}
+	}
+	return true
+}
+
+func isASCIIIdentifier(value string) bool {
+	if value == "" {
+		return false
+	}
+	for i := 0; i < len(value); i++ {
+		ch := value[i]
+		if (ch < 'a' || ch > 'z') && (ch < 'A' || ch > 'Z') && ch != '_' && (i == 0 || ch < '0' || ch > '9') {
+			return false
+		}
+	}
+	return true
+}
+
+func (g *generator) estimateNodes(nodes []ast.Node, slots map[string][]ast.Node, seen map[string]bool) int {
+	size := 0
+	for _, node := range nodes {
+		size += g.estimateNode(node, slots, seen)
+	}
+	return size
+}
+
+func (g *generator) estimateNode(node ast.Node, slots map[string][]ast.Node, seen map[string]bool) int {
+	switch n := node.(type) {
+	case *ast.Text:
+		return len(n.Value)
+	case *ast.Expr:
+		return bufferExpressionHint
+	case *ast.Comment:
+		return len("<!--") + len(n.Value) + len("-->")
+	case *ast.Doctype:
+		return len("<!") + len(n.Value) + len(">")
+	case *ast.If:
+		maxSize := 0
+		for _, branch := range n.Branches {
+			maxSize = max(maxSize, g.estimateNodes(branch.Body, slots, seen))
+		}
+		return max(maxSize, g.estimateNodes(n.ElseBody, slots, seen))
+	case *ast.For:
+		return g.estimateNodes(n.Body, slots, seen)
+	case *ast.Element:
+		return g.estimateElement(n, slots, seen)
+	default:
+		return 0
+	}
+}
+
+func (g *generator) estimateElement(elem *ast.Element, slots map[string][]ast.Node, seen map[string]bool) int {
+	if elem.Name == "fragment" {
+		return g.estimateNodes(elem.Children, slots, seen)
+	}
+	if elem.Name == "slot" {
+		name := "default"
+		if attr, ok := elem.Attr("name"); ok && attr.Kind == ast.AttrString && attr.Value != "" {
+			name = attr.Value
+		}
+		nodes := slots[name]
+		if _, ok := forwardedSlotExpr(nodes); ok {
+			return 0
+		}
+		return g.estimateNodes(nodes, nil, seen)
+	}
+	if elem.Name == "raw" {
+		return 0
+	}
+	if elem.IsComponent() {
+		resolved, ok := g.pkg.ResolveComponent(g.file, elem.Name)
+		if ok && !resolved.External && !seen[resolved.Component.Decl.Name] {
+			nextSeen := cloneSeen(seen)
+			nextSeen[resolved.Component.Decl.Name] = true
+			return g.estimateNodes(resolved.Component.Decl.Body, groupSlots(elem.Children), nextSeen)
+		}
+		return 0
+	}
+	size := len("<") + len(elem.Name)
+	for _, attr := range elem.Attributes {
+		switch attr.Kind {
+		case ast.AttrBool:
+			size += len(" ") + len(attr.Name)
+		case ast.AttrString:
+			size += len(" ") + len(attr.Name) + len(`=""`) + len(stdhtml.EscapeString(attr.Value))
+		case ast.AttrExpression:
+			size += len(" ") + len(attr.Name) + len(`=""`) + bufferExpressionHint
+		}
+	}
+	if elem.SelfClose {
+		return size + len(" />")
+	}
+	size += len(">")
+	size += g.estimateNodes(elem.Children, slots, seen)
+	if !isVoid(elem.Name) {
+		size += len("</") + len(elem.Name) + len(">")
+	}
+	return size
+}
+
+func cloneSeen(seen map[string]bool) map[string]bool {
+	next := make(map[string]bool, len(seen)+1)
+	for key, value := range seen {
+		next[key] = value
+	}
+	return next
 }
 
 func (g *generator) emitSlotOutlet(elem *ast.Element) error {

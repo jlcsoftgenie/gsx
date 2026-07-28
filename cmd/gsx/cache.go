@@ -14,7 +14,7 @@ import (
 	"github.com/jlcsoftgenie/gsx/internal/project"
 )
 
-const generationCacheSalt = "gsx-generate-cache-v2"
+const generationCacheSalt = "gsx-generate-cache-v4"
 
 type generateCache struct {
 	Version  int                          `json:"version"`

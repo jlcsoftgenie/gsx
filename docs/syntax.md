@@ -31,7 +31,14 @@ component UserCard(user User) {
 
 Public generated API:
 - `RenderUserCard(w io.Writer, user User) error`
+- `RenderUserCardBuffer(buf *bytes.Buffer, user User) error`
 - `RenderUserCardWithSlots(w io.Writer, slots GSXUserCardSlots, user User) error`
+- `RenderUserCardBufferWithSlots(buf *bytes.Buffer, slots GSXUserCardSlots, user User) error`
+
+`Render...Buffer` is an opt-in helper for callers that need the complete HTML in a
+`bytes.Buffer` before using it. It pre-grows that buffer with a compile-time
+size hint. Streaming `Render...` functions remain the normal choice for HTTP
+responses.
 
 Internal generated API:
 - `renderUserCard(w io.Writer, slots GSXUserCardSlots, user User) error`

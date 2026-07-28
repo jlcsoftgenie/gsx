@@ -3,6 +3,7 @@
 package main
 
 import (
+	gsxbytes "bytes"
 	gsxrt "github.com/jlcsoftgenie/gsx/runtime"
 	gsxio "io"
 )
@@ -18,8 +19,18 @@ func RenderBaseLayout(w gsxio.Writer, title string) error {
 	return renderBaseLayout(w, GSXBaseLayoutSlots{}, title)
 }
 
+func RenderBaseLayoutBuffer(__gsx_buf *gsxbytes.Buffer, title string) error {
+	__gsx_buf.Grow(172)
+	return renderBaseLayout(__gsx_buf, GSXBaseLayoutSlots{}, title)
+}
+
 func RenderBaseLayoutWithSlots(w gsxio.Writer, slots GSXBaseLayoutSlots, title string) error {
 	return renderBaseLayout(w, slots, title)
+}
+
+func RenderBaseLayoutBufferWithSlots(__gsx_buf *gsxbytes.Buffer, slots GSXBaseLayoutSlots, title string) error {
+	__gsx_buf.Grow(172)
+	return renderBaseLayout(__gsx_buf, slots, title)
 }
 
 func renderBaseLayout(w gsxio.Writer, __gsx_slots GSXBaseLayoutSlots, title string) error {
@@ -77,13 +88,22 @@ func RenderAuthLayout(w gsxio.Writer, title string) error {
 	return renderAuthLayout(w, GSXAuthLayoutSlots{}, title)
 }
 
+func RenderAuthLayoutBuffer(__gsx_buf *gsxbytes.Buffer, title string) error {
+	__gsx_buf.Grow(278)
+	return renderAuthLayout(__gsx_buf, GSXAuthLayoutSlots{}, title)
+}
+
 func RenderAuthLayoutWithSlots(w gsxio.Writer, slots GSXAuthLayoutSlots, title string) error {
 	return renderAuthLayout(w, slots, title)
 }
 
+func RenderAuthLayoutBufferWithSlots(__gsx_buf *gsxbytes.Buffer, slots GSXAuthLayoutSlots, title string) error {
+	__gsx_buf.Grow(278)
+	return renderAuthLayout(__gsx_buf, slots, title)
+}
+
 func renderAuthLayout(w gsxio.Writer, __gsx_slots GSXAuthLayoutSlots, title string) error {
 	{
-		title := title
 		if err := gsxrt.WriteString(w, "<!doctype html><html><head><meta charset=\"utf-8\" /><title>"); err != nil {
 			return err
 		}
@@ -127,15 +147,24 @@ func RenderProfilePage(w gsxio.Writer, data ProfileData) error {
 	return renderProfilePage(w, GSXProfilePageSlots{}, data)
 }
 
+func RenderProfilePageBuffer(__gsx_buf *gsxbytes.Buffer, data ProfileData) error {
+	__gsx_buf.Grow(278)
+	return renderProfilePage(__gsx_buf, GSXProfilePageSlots{}, data)
+}
+
 func RenderProfilePageWithSlots(w gsxio.Writer, slots GSXProfilePageSlots, data ProfileData) error {
 	return renderProfilePage(w, slots, data)
+}
+
+func RenderProfilePageBufferWithSlots(__gsx_buf *gsxbytes.Buffer, slots GSXProfilePageSlots, data ProfileData) error {
+	__gsx_buf.Grow(278)
+	return renderProfilePage(__gsx_buf, slots, data)
 }
 
 func renderProfilePage(w gsxio.Writer, __gsx_slots GSXProfilePageSlots, data ProfileData) error {
 	{
 		title := data.Title
 		{
-			title := title
 			if err := gsxrt.WriteString(w, "<!doctype html><html><head><meta charset=\"utf-8\" /><title>"); err != nil {
 				return err
 			}

@@ -22,11 +22,36 @@ func benchUsers(n int) []User {
 	return users
 }
 
+func TestBufferRenderMatchesStreamingRender(t *testing.T) {
+	users := benchUsers(3)
+	var streamed bytes.Buffer
+	if err := RenderBenchList(&streamed, "Bench", users); err != nil {
+		t.Fatal(err)
+	}
+	var buffered bytes.Buffer
+	if err := RenderBenchListBuffer(&buffered, "Bench", users); err != nil {
+		t.Fatal(err)
+	}
+	if streamed.String() != buffered.String() {
+		t.Fatalf("buffer helper output differs from streaming output\nstreamed: %q\nbuffered: %q", streamed.String(), buffered.String())
+	}
+}
+
 func BenchmarkGSXSimple(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		var buf bytes.Buffer
 		if err := RenderBenchSimple(&buf, "Bench"); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkGSXSimpleBuffer(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		var buf bytes.Buffer
+		if err := RenderBenchSimpleBuffer(&buf, "Bench"); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -102,6 +127,17 @@ func BenchmarkGSXList(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		var buf bytes.Buffer
 		if err := RenderBenchList(&buf, "Bench", users); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkGSXListBuffer(b *testing.B) {
+	b.ReportAllocs()
+	users := benchUsers(200)
+	for i := 0; i < b.N; i++ {
+		var buf bytes.Buffer
+		if err := RenderBenchListBuffer(&buf, "Bench", users); err != nil {
 			b.Fatal(err)
 		}
 	}

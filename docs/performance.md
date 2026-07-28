@@ -12,6 +12,7 @@ GSX is optimized around ahead-of-time code generation and direct writes to `io.W
 - Escaping uses typed runtime helpers with fast no-escape paths for strings and byte slices.
 - String writes avoid `[]byte(s)` fallback allocations for plain `io.Writer` implementations.
 - Static HTML is emitted as direct string writes, not rebuilt through a node tree.
+- Generated `Render...Buffer` helpers pre-grow `bytes.Buffer` values with generated size heuristics.
 
 ## Benchmark command
 
@@ -25,34 +26,56 @@ Machine:
 - OS: Linux amd64
 - CPU: Intel(R) Core(TM) Ultra 9 275HX
 
-Results captured on May 29, 2026:
+Results captured on July 27, 2026 with Go 1.26.2:
 
 | Benchmark | ns/op | B/op | allocs/op |
 | --- | ---: | ---: | ---: |
-| `BenchmarkGSXSimple` | 143.9 | 496 | 4 |
-| `BenchmarkGSXSimpleDiscard` | 43.07 | 0 | 0 |
-| `BenchmarkGSXSimpleResponseRecorder` | 445.6 | 1456 | 12 |
-| `BenchmarkGSXSimplePlainWriter` | 45.72 | 8 | 1 |
-| `BenchmarkHTMLTemplateSimple` | 834.7 | 864 | 17 |
-| `BenchmarkGomponentsSimple` | 744.2 | 1288 | 30 |
-| `BenchmarkGSXList` | 10742 | 32752 | 10 |
-| `BenchmarkGSXListDiscard` | 5219 | 0 | 0 |
-| `BenchmarkGSXListResponseRecorder` | 13083 | 33712 | 18 |
-| `BenchmarkGSXListPlainWriter` | 5288 | 8 | 1 |
-| `BenchmarkGSXNestedLayouts` | 11224 | 32752 | 10 |
-| `BenchmarkHTMLTemplateList` | 147580 | 84475 | 2424 |
-| `BenchmarkGomponentsList` | 67384 | 112200 | 2437 |
+| `BenchmarkGSXSimple` | 217.4 | 496 | 4 |
+| `BenchmarkGSXSimpleBuffer` | 153.8 | 272 | 2 |
+| `BenchmarkGSXSimpleDiscard` | 50.34 | 0 | 0 |
+| `BenchmarkGSXSimpleResponseRecorder` | 654.3 | 1456 | 12 |
+| `BenchmarkGSXSimplePlainWriter` | 54.92 | 8 | 1 |
+| `BenchmarkHTMLTemplateSimple` | 1164 | 864 | 17 |
+| `BenchmarkGomponentsSimple` | 1047 | 1288 | 30 |
+| `BenchmarkGSXList` | 15455 | 32752 | 10 |
+| `BenchmarkGSXListBuffer` | 11578 | 24624 | 2 |
+| `BenchmarkGSXListDiscard` | 6303 | 0 | 0 |
+| `BenchmarkGSXListResponseRecorder` | 18244 | 33712 | 18 |
+| `BenchmarkGSXListPlainWriter` | 6364 | 8 | 1 |
+| `BenchmarkGSXNestedLayouts` | 15518 | 32752 | 10 |
+| `BenchmarkHTMLTemplateList` | 202122 | 84474 | 2424 |
+| `BenchmarkGomponentsList` | 93879 | 112200 | 2437 |
 
 ## Reading the numbers
 
 Current steady-state render behavior in this repo shows:
-- GSX is roughly 5.8x faster than `html/template` on the simple page benchmark.
-- GSX is roughly 5.2x faster than `gomponents` on the simple page benchmark.
-- GSX is roughly 13.7x faster than `html/template` on the list benchmark.
-- GSX is roughly 6.3x faster than `gomponents` on the list benchmark.
-- GSX also allocates materially less in both benchmark groups.
+- The normal streaming GSX API is roughly 5.4x faster than `html/template` on the simple page benchmark.
+- The buffered GSX API is roughly 7.6x faster than `html/template` on the same fixture, with 2 allocations instead of 4.
+- The normal streaming GSX API is roughly 13.1x faster than `html/template` on the list benchmark.
+- The buffered GSX API is roughly 17.5x faster than `html/template` on the same list, with 2 allocations instead of 10.
+- GSX is also faster and allocates materially less than `gomponents` in both benchmark groups.
 - The nested-layout benchmark stays close to the plain list benchmark even with an extra forwarded named slot and wrapper layout layer.
 - Writer choice matters: direct streaming to `io.Discard` or a plain writer avoids buffer growth allocations that are present in `bytes.Buffer` benchmarks.
+
+## Buffered rendering
+
+The normal generated API streams directly to `io.Writer` and is the best fit for
+`http.ResponseWriter`. When a caller deliberately needs an in-memory document,
+use the generated `Render<Component>Buffer` function:
+
+```go
+var buf bytes.Buffer
+if err := RenderHomePageBuffer(&buf, title, users); err != nil {
+	return err
+}
+html := buf.String()
+```
+
+These helpers call `buf.Grow` with a generated heuristic. It includes static
+markup, literal attributes, small budgets for dynamic fields, safely inlined
+local components, and top-level `range` loops over component parameters. It
+never limits output or changes rendering semantics; an underestimated hint simply
+lets `bytes.Buffer` grow normally.
 
 ## Caveats
 
@@ -63,11 +86,10 @@ Benchmark results depend on:
 - component shape
 - slot and closure usage
 
-Simple components are close to the best-case path. Heavy slot composition and large loops still perform well, but output buffering can dominate allocations when rendering into growing buffers.
+Simple components are close to the best-case path. Heavy slot composition and large loops still perform well. For a growing `bytes.Buffer`, the generated buffer API can reduce allocation pressure when its hint matches the rendered data shape.
 
 ## Where to improve next
 
 Likely future optimization targets:
-- reducing writer growth pressure on very large responses
-- optional generated size hints for buffered rendering
 - more compile-time specialization for cross-package component calls
+- dynamic output-size hints for known collection sizes

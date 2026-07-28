@@ -3,6 +3,7 @@
 package benchmarks
 
 import (
+	gsxbytes "bytes"
 	gsxrt "github.com/jlcsoftgenie/gsx/runtime"
 	gsxio "io"
 )
@@ -15,8 +16,18 @@ func RenderBenchLayout(w gsxio.Writer, title string) error {
 	return renderBenchLayout(w, GSXBenchLayoutSlots{}, title)
 }
 
+func RenderBenchLayoutBuffer(__gsx_buf *gsxbytes.Buffer, title string) error {
+	__gsx_buf.Grow(125)
+	return renderBenchLayout(__gsx_buf, GSXBenchLayoutSlots{}, title)
+}
+
 func RenderBenchLayoutWithSlots(w gsxio.Writer, slots GSXBenchLayoutSlots, title string) error {
 	return renderBenchLayout(w, slots, title)
+}
+
+func RenderBenchLayoutBufferWithSlots(__gsx_buf *gsxbytes.Buffer, slots GSXBenchLayoutSlots, title string) error {
+	__gsx_buf.Grow(125)
+	return renderBenchLayout(__gsx_buf, slots, title)
 }
 
 func renderBenchLayout(w gsxio.Writer, __gsx_slots GSXBenchLayoutSlots, title string) error {
@@ -46,8 +57,18 @@ func RenderBenchUserRow(w gsxio.Writer, user User) error {
 	return renderBenchUserRow(w, GSXBenchUserRowSlots{}, user)
 }
 
+func RenderBenchUserRowBuffer(__gsx_buf *gsxbytes.Buffer, user User) error {
+	__gsx_buf.Grow(120)
+	return renderBenchUserRow(__gsx_buf, GSXBenchUserRowSlots{}, user)
+}
+
 func RenderBenchUserRowWithSlots(w gsxio.Writer, slots GSXBenchUserRowSlots, user User) error {
 	return renderBenchUserRow(w, slots, user)
+}
+
+func RenderBenchUserRowBufferWithSlots(__gsx_buf *gsxbytes.Buffer, slots GSXBenchUserRowSlots, user User) error {
+	__gsx_buf.Grow(120)
+	return renderBenchUserRow(__gsx_buf, slots, user)
 }
 
 func renderBenchUserRow(w gsxio.Writer, __gsx_slots GSXBenchUserRowSlots, user User) error {
@@ -75,13 +96,22 @@ func RenderBenchSimple(w gsxio.Writer, title string) error {
 	return renderBenchSimple(w, GSXBenchSimpleSlots{}, title)
 }
 
+func RenderBenchSimpleBuffer(__gsx_buf *gsxbytes.Buffer, title string) error {
+	__gsx_buf.Grow(216)
+	return renderBenchSimple(__gsx_buf, GSXBenchSimpleSlots{}, title)
+}
+
 func RenderBenchSimpleWithSlots(w gsxio.Writer, slots GSXBenchSimpleSlots, title string) error {
 	return renderBenchSimple(w, slots, title)
 }
 
+func RenderBenchSimpleBufferWithSlots(__gsx_buf *gsxbytes.Buffer, slots GSXBenchSimpleSlots, title string) error {
+	__gsx_buf.Grow(216)
+	return renderBenchSimple(__gsx_buf, slots, title)
+}
+
 func renderBenchSimple(w gsxio.Writer, __gsx_slots GSXBenchSimpleSlots, title string) error {
 	{
-		title := title
 		if err := gsxrt.WriteString(w, "<!doctype html><html><head><meta charset=\"utf-8\" /><title>"); err != nil {
 			return err
 		}
@@ -110,8 +140,18 @@ func RenderBenchBaseLayout(w gsxio.Writer, title string) error {
 	return renderBenchBaseLayout(w, GSXBenchBaseLayoutSlots{}, title)
 }
 
+func RenderBenchBaseLayoutBuffer(__gsx_buf *gsxbytes.Buffer, title string) error {
+	__gsx_buf.Grow(125)
+	return renderBenchBaseLayout(__gsx_buf, GSXBenchBaseLayoutSlots{}, title)
+}
+
 func RenderBenchBaseLayoutWithSlots(w gsxio.Writer, slots GSXBenchBaseLayoutSlots, title string) error {
 	return renderBenchBaseLayout(w, slots, title)
+}
+
+func RenderBenchBaseLayoutBufferWithSlots(__gsx_buf *gsxbytes.Buffer, slots GSXBenchBaseLayoutSlots, title string) error {
+	__gsx_buf.Grow(125)
+	return renderBenchBaseLayout(__gsx_buf, slots, title)
 }
 
 func renderBenchBaseLayout(w gsxio.Writer, __gsx_slots GSXBenchBaseLayoutSlots, title string) error {
@@ -152,13 +192,22 @@ func RenderBenchShellLayout(w gsxio.Writer, title string) error {
 	return renderBenchShellLayout(w, GSXBenchShellLayoutSlots{}, title)
 }
 
+func RenderBenchShellLayoutBuffer(__gsx_buf *gsxbytes.Buffer, title string) error {
+	__gsx_buf.Grow(158)
+	return renderBenchShellLayout(__gsx_buf, GSXBenchShellLayoutSlots{}, title)
+}
+
 func RenderBenchShellLayoutWithSlots(w gsxio.Writer, slots GSXBenchShellLayoutSlots, title string) error {
 	return renderBenchShellLayout(w, slots, title)
 }
 
+func RenderBenchShellLayoutBufferWithSlots(__gsx_buf *gsxbytes.Buffer, slots GSXBenchShellLayoutSlots, title string) error {
+	__gsx_buf.Grow(158)
+	return renderBenchShellLayout(__gsx_buf, slots, title)
+}
+
 func renderBenchShellLayout(w gsxio.Writer, __gsx_slots GSXBenchShellLayoutSlots, title string) error {
 	{
-		title := title
 		if err := gsxrt.WriteString(w, "<!doctype html><html><head><meta charset=\"utf-8\" /><title>"); err != nil {
 			return err
 		}
@@ -194,13 +243,22 @@ func RenderBenchList(w gsxio.Writer, title string, users []User) error {
 	return renderBenchList(w, GSXBenchListSlots{}, title, users)
 }
 
+func RenderBenchListBuffer(__gsx_buf *gsxbytes.Buffer, title string, users []User) error {
+	__gsx_buf.Grow(308 + len(users)*120)
+	return renderBenchList(__gsx_buf, GSXBenchListSlots{}, title, users)
+}
+
 func RenderBenchListWithSlots(w gsxio.Writer, slots GSXBenchListSlots, title string, users []User) error {
 	return renderBenchList(w, slots, title, users)
 }
 
+func RenderBenchListBufferWithSlots(__gsx_buf *gsxbytes.Buffer, slots GSXBenchListSlots, title string, users []User) error {
+	__gsx_buf.Grow(308 + len(users)*120)
+	return renderBenchList(__gsx_buf, slots, title, users)
+}
+
 func renderBenchList(w gsxio.Writer, __gsx_slots GSXBenchListSlots, title string, users []User) error {
 	{
-		title := title
 		if err := gsxrt.WriteString(w, "<!doctype html><html><head><meta charset=\"utf-8\" /><title>"); err != nil {
 			return err
 		}
@@ -218,7 +276,6 @@ func renderBenchList(w gsxio.Writer, __gsx_slots GSXBenchListSlots, title string
 		}
 		for _, user := range users {
 			{
-				user := user
 				if err := gsxrt.WriteString(w, "<li class=\"user-row\"><strong>"); err != nil {
 					return err
 				}
@@ -249,15 +306,23 @@ func RenderBenchNestedLayouts(w gsxio.Writer, title string, users []User) error 
 	return renderBenchNestedLayouts(w, GSXBenchNestedLayoutsSlots{}, title, users)
 }
 
+func RenderBenchNestedLayoutsBuffer(__gsx_buf *gsxbytes.Buffer, title string, users []User) error {
+	__gsx_buf.Grow(158 + len(users)*120)
+	return renderBenchNestedLayouts(__gsx_buf, GSXBenchNestedLayoutsSlots{}, title, users)
+}
+
 func RenderBenchNestedLayoutsWithSlots(w gsxio.Writer, slots GSXBenchNestedLayoutsSlots, title string, users []User) error {
 	return renderBenchNestedLayouts(w, slots, title, users)
 }
 
+func RenderBenchNestedLayoutsBufferWithSlots(__gsx_buf *gsxbytes.Buffer, slots GSXBenchNestedLayoutsSlots, title string, users []User) error {
+	__gsx_buf.Grow(158 + len(users)*120)
+	return renderBenchNestedLayouts(__gsx_buf, slots, title, users)
+}
+
 func renderBenchNestedLayouts(w gsxio.Writer, __gsx_slots GSXBenchNestedLayoutsSlots, title string, users []User) error {
 	{
-		title := title
 		{
-			title := title
 			if err := gsxrt.WriteString(w, "<!doctype html><html><head><meta charset=\"utf-8\" /><title>"); err != nil {
 				return err
 			}
@@ -281,7 +346,6 @@ func renderBenchNestedLayouts(w gsxio.Writer, __gsx_slots GSXBenchNestedLayoutsS
 			}
 			for _, user := range users {
 				{
-					user := user
 					if err := gsxrt.WriteString(w, "<li class=\"user-row\"><strong>"); err != nil {
 						return err
 					}

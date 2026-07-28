@@ -3,6 +3,7 @@
 package main
 
 import (
+	gsxbytes "bytes"
 	shared "github.com/jlcsoftgenie/gsx/examples/shared/layouts"
 	gsxrt "github.com/jlcsoftgenie/gsx/runtime"
 	gsxio "io"
@@ -14,8 +15,18 @@ func RenderSiteNav(w gsxio.Writer) error {
 	return renderSiteNav(w, GSXSiteNavSlots{})
 }
 
+func RenderSiteNavBuffer(__gsx_buf *gsxbytes.Buffer) error {
+	__gsx_buf.Grow(118)
+	return renderSiteNav(__gsx_buf, GSXSiteNavSlots{})
+}
+
 func RenderSiteNavWithSlots(w gsxio.Writer, slots GSXSiteNavSlots) error {
 	return renderSiteNav(w, slots)
+}
+
+func RenderSiteNavBufferWithSlots(__gsx_buf *gsxbytes.Buffer, slots GSXSiteNavSlots) error {
+	__gsx_buf.Grow(118)
+	return renderSiteNav(__gsx_buf, slots)
 }
 
 func renderSiteNav(w gsxio.Writer, __gsx_slots GSXSiteNavSlots) error {
@@ -31,8 +42,18 @@ func RenderUserRow(w gsxio.Writer, user User) error {
 	return renderUserRow(w, GSXUserRowSlots{}, user)
 }
 
+func RenderUserRowBuffer(__gsx_buf *gsxbytes.Buffer, user User) error {
+	__gsx_buf.Grow(132)
+	return renderUserRow(__gsx_buf, GSXUserRowSlots{}, user)
+}
+
 func RenderUserRowWithSlots(w gsxio.Writer, slots GSXUserRowSlots, user User) error {
 	return renderUserRow(w, slots, user)
+}
+
+func RenderUserRowBufferWithSlots(__gsx_buf *gsxbytes.Buffer, slots GSXUserRowSlots, user User) error {
+	__gsx_buf.Grow(132)
+	return renderUserRow(__gsx_buf, slots, user)
 }
 
 func renderUserRow(w gsxio.Writer, __gsx_slots GSXUserRowSlots, user User) error {
@@ -66,8 +87,18 @@ func RenderUserTable(w gsxio.Writer, users []User) error {
 	return renderUserTable(w, GSXUserTableSlots{}, users)
 }
 
+func RenderUserTableBuffer(__gsx_buf *gsxbytes.Buffer, users []User) error {
+	__gsx_buf.Grow(226 + len(users)*132)
+	return renderUserTable(__gsx_buf, GSXUserTableSlots{}, users)
+}
+
 func RenderUserTableWithSlots(w gsxio.Writer, slots GSXUserTableSlots, users []User) error {
 	return renderUserTable(w, slots, users)
+}
+
+func RenderUserTableBufferWithSlots(__gsx_buf *gsxbytes.Buffer, slots GSXUserTableSlots, users []User) error {
+	__gsx_buf.Grow(226 + len(users)*132)
+	return renderUserTable(__gsx_buf, slots, users)
 }
 
 func renderUserTable(w gsxio.Writer, __gsx_slots GSXUserTableSlots, users []User) error {
@@ -76,7 +107,6 @@ func renderUserTable(w gsxio.Writer, __gsx_slots GSXUserTableSlots, users []User
 	}
 	for _, user := range users {
 		{
-			user := user
 			if err := gsxrt.WriteString(w, "<tr><td>"); err != nil {
 				return err
 			}
@@ -112,8 +142,18 @@ func RenderHomePage(w gsxio.Writer, title string, description string, users []Us
 	return renderHomePage(w, GSXHomePageSlots{}, title, description, users)
 }
 
+func RenderHomePageBuffer(__gsx_buf *gsxbytes.Buffer, title string, description string, users []User) error {
+	__gsx_buf.Grow(0)
+	return renderHomePage(__gsx_buf, GSXHomePageSlots{}, title, description, users)
+}
+
 func RenderHomePageWithSlots(w gsxio.Writer, slots GSXHomePageSlots, title string, description string, users []User) error {
 	return renderHomePage(w, slots, title, description, users)
+}
+
+func RenderHomePageBufferWithSlots(__gsx_buf *gsxbytes.Buffer, slots GSXHomePageSlots, title string, description string, users []User) error {
+	__gsx_buf.Grow(0)
+	return renderHomePage(__gsx_buf, slots, title, description, users)
 }
 
 func renderHomePage(w gsxio.Writer, __gsx_slots GSXHomePageSlots, title string, description string, users []User) error {
@@ -171,8 +211,18 @@ func RenderUsersPage(w gsxio.Writer, title string, users []User) error {
 	return renderUsersPage(w, GSXUsersPageSlots{}, title, users)
 }
 
+func RenderUsersPageBuffer(__gsx_buf *gsxbytes.Buffer, title string, users []User) error {
+	__gsx_buf.Grow(0)
+	return renderUsersPage(__gsx_buf, GSXUsersPageSlots{}, title, users)
+}
+
 func RenderUsersPageWithSlots(w gsxio.Writer, slots GSXUsersPageSlots, title string, users []User) error {
 	return renderUsersPage(w, slots, title, users)
+}
+
+func RenderUsersPageBufferWithSlots(__gsx_buf *gsxbytes.Buffer, slots GSXUsersPageSlots, title string, users []User) error {
+	__gsx_buf.Grow(0)
+	return renderUsersPage(__gsx_buf, slots, title, users)
 }
 
 func renderUsersPage(w gsxio.Writer, __gsx_slots GSXUsersPageSlots, title string, users []User) error {
@@ -204,13 +254,11 @@ func renderUsersPage(w gsxio.Writer, __gsx_slots GSXUsersPageSlots, title string
 				}
 			} else {
 				{
-					users := users
 					if err := gsxrt.WriteString(w, "<table><thead><tr><th>Name</th><th>Email</th><th>Role</th></tr></thead><tbody>"); err != nil {
 						return err
 					}
 					for _, user := range users {
 						{
-							user := user
 							if err := gsxrt.WriteString(w, "<tr><td>"); err != nil {
 								return err
 							}

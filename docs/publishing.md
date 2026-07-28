@@ -40,20 +40,20 @@ git remote add origin https://github.com/jlcsoftgenie/gsx.git
 For Go modules, an annotated semver tag is enough for consumers and pkg.go.dev:
 
 ```bash
-git tag -a v0.3.0 -m "GSX v0.3.0"
-git push origin v0.3.0
+git tag -a v0.4.0 -m "GSX v0.4.0"
+git push origin v0.4.0
 ```
 
 After the tag is reachable on GitHub, users can install the CLI with:
 
 ```bash
-go install github.com/jlcsoftgenie/gsx/cmd/gsx@v0.3.0
+go install github.com/jlcsoftgenie/gsx/cmd/gsx@v0.4.0
 ```
 
 Or depend on the module with:
 
 ```bash
-go get github.com/jlcsoftgenie/gsx@v0.3.0
+go get github.com/jlcsoftgenie/gsx@v0.4.0
 ```
 
 ## 4. Verify the public module
@@ -64,7 +64,7 @@ From another directory:
 mkdir /tmp/gsx-smoke
 cd /tmp/gsx-smoke
 go mod init example.com/smoke
-go install github.com/jlcsoftgenie/gsx/cmd/gsx@v0.3.0
+go install github.com/jlcsoftgenie/gsx/cmd/gsx@v0.4.0
 ```
 
 Then scaffold a starter app:
@@ -81,7 +81,7 @@ Any local repos that currently use a placeholder path or local replace should be
 Example for `ylloyds`:
 
 ```go
-require github.com/jlcsoftgenie/gsx v0.3.0
+require github.com/jlcsoftgenie/gsx v0.4.0
 ```
 
 During local development you can still keep:

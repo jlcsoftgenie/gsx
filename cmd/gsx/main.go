@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	version    = "0.3.0"
+	version    = "0.4.0"
 	modulePath = "github.com/jlcsoftgenie/gsx"
 )
 
@@ -50,6 +50,8 @@ func run(args []string) error {
 		return runFmt(args[1:])
 	case "watch":
 		return runWatch(args[1:])
+	case "doctor":
+		return runDoctor(args[1:])
 	case "init":
 		return runInit(args[1:])
 	case "version":
@@ -61,7 +63,7 @@ func run(args []string) error {
 }
 
 func usageError() error {
-	return errors.New("usage: gsx <generate|build|check|lint|fmt|watch|init|version> [paths...]")
+	return errors.New("usage: gsx <generate|build|check|lint|fmt|watch|doctor|init|version> [paths...]")
 }
 
 func runGenerate(args []string) error {

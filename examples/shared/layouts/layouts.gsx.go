@@ -3,6 +3,7 @@
 package layouts
 
 import (
+	gsxbytes "bytes"
 	gsxrt "github.com/jlcsoftgenie/gsx/runtime"
 	gsxio "io"
 )
@@ -16,8 +17,18 @@ func RenderShell(w gsxio.Writer, title string) error {
 	return renderShell(w, GSXShellSlots{}, title)
 }
 
+func RenderShellBuffer(__gsx_buf *gsxbytes.Buffer, title string) error {
+	__gsx_buf.Grow(276)
+	return renderShell(__gsx_buf, GSXShellSlots{}, title)
+}
+
 func RenderShellWithSlots(w gsxio.Writer, slots GSXShellSlots, title string) error {
 	return renderShell(w, slots, title)
+}
+
+func RenderShellBufferWithSlots(__gsx_buf *gsxbytes.Buffer, slots GSXShellSlots, title string) error {
+	__gsx_buf.Grow(276)
+	return renderShell(__gsx_buf, slots, title)
 }
 
 func renderShell(w gsxio.Writer, __gsx_slots GSXShellSlots, title string) error {
@@ -58,13 +69,22 @@ func RenderPanel(w gsxio.Writer, title string) error {
 	return renderPanel(w, GSXPanelSlots{}, title)
 }
 
+func RenderPanelBuffer(__gsx_buf *gsxbytes.Buffer, title string) error {
+	__gsx_buf.Grow(315)
+	return renderPanel(__gsx_buf, GSXPanelSlots{}, title)
+}
+
 func RenderPanelWithSlots(w gsxio.Writer, slots GSXPanelSlots, title string) error {
 	return renderPanel(w, slots, title)
 }
 
+func RenderPanelBufferWithSlots(__gsx_buf *gsxbytes.Buffer, slots GSXPanelSlots, title string) error {
+	__gsx_buf.Grow(315)
+	return renderPanel(__gsx_buf, slots, title)
+}
+
 func renderPanel(w gsxio.Writer, __gsx_slots GSXPanelSlots, title string) error {
 	{
-		title := title
 		if err := gsxrt.WriteString(w, "<!doctype html><html><head><meta charset=\"utf-8\" /><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /><title>"); err != nil {
 			return err
 		}

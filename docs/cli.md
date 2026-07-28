@@ -91,6 +91,19 @@ Flags:
 
 In `--build` mode, `watch` also reacts to `.go`, `go.mod`, `go.sum`, `go.work`, and `go.work.sum` changes.
 
+### `gsx doctor`
+
+Checks that the project is ready to build and ship.
+
+```bash
+gsx doctor .
+```
+
+It verifies the minimum Go version, reports whether the optional `gopls` editor
+integration is available, validates templates, and reports missing or stale
+`.gsx.go` files without modifying them. Use it in CI when generated files are
+committed to source control.
+
 ### `gsx init`
 
 Creates a starter GSX project in the target directory and generates the initial `.gsx.go` output.

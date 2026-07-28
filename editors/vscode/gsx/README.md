@@ -101,7 +101,7 @@ npm run package
 Install or update it in your main VS Code:
 
 ```bash
-code --install-extension gsx-language-tools-0.3.0.vsix --force
+code --install-extension gsx-language-tools-0.4.0.vsix --force
 ```
 
 Then run `Developer: Reload Window`.

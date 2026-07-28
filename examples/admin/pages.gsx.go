@@ -3,6 +3,7 @@
 package main
 
 import (
+	gsxbytes "bytes"
 	gsxrt "github.com/jlcsoftgenie/gsx/runtime"
 	gsxio "io"
 )
@@ -13,8 +14,18 @@ func RenderMetricCard(w gsxio.Writer, metric Metric) error {
 	return renderMetricCard(w, GSXMetricCardSlots{}, metric)
 }
 
+func RenderMetricCardBuffer(__gsx_buf *gsxbytes.Buffer, metric Metric) error {
+	__gsx_buf.Grow(119)
+	return renderMetricCard(__gsx_buf, GSXMetricCardSlots{}, metric)
+}
+
 func RenderMetricCardWithSlots(w gsxio.Writer, slots GSXMetricCardSlots, metric Metric) error {
 	return renderMetricCard(w, slots, metric)
+}
+
+func RenderMetricCardBufferWithSlots(__gsx_buf *gsxbytes.Buffer, slots GSXMetricCardSlots, metric Metric) error {
+	__gsx_buf.Grow(119)
+	return renderMetricCard(__gsx_buf, slots, metric)
 }
 
 func renderMetricCard(w gsxio.Writer, __gsx_slots GSXMetricCardSlots, metric Metric) error {
@@ -45,8 +56,18 @@ func RenderDashboardLayout(w gsxio.Writer, title string) error {
 	return renderDashboardLayout(w, GSXDashboardLayoutSlots{}, title)
 }
 
+func RenderDashboardLayoutBuffer(__gsx_buf *gsxbytes.Buffer, title string) error {
+	__gsx_buf.Grow(276)
+	return renderDashboardLayout(__gsx_buf, GSXDashboardLayoutSlots{}, title)
+}
+
 func RenderDashboardLayoutWithSlots(w gsxio.Writer, slots GSXDashboardLayoutSlots, title string) error {
 	return renderDashboardLayout(w, slots, title)
+}
+
+func RenderDashboardLayoutBufferWithSlots(__gsx_buf *gsxbytes.Buffer, slots GSXDashboardLayoutSlots, title string) error {
+	__gsx_buf.Grow(276)
+	return renderDashboardLayout(__gsx_buf, slots, title)
 }
 
 func renderDashboardLayout(w gsxio.Writer, __gsx_slots GSXDashboardLayoutSlots, title string) error {
@@ -84,8 +105,18 @@ func RenderDashboardPage(w gsxio.Writer, data DashboardData) error {
 	return renderDashboardPage(w, GSXDashboardPageSlots{}, data)
 }
 
+func RenderDashboardPageBuffer(__gsx_buf *gsxbytes.Buffer, data DashboardData) error {
+	__gsx_buf.Grow(853 + len(data.Metrics)*119)
+	return renderDashboardPage(__gsx_buf, GSXDashboardPageSlots{}, data)
+}
+
 func RenderDashboardPageWithSlots(w gsxio.Writer, slots GSXDashboardPageSlots, data DashboardData) error {
 	return renderDashboardPage(w, slots, data)
+}
+
+func RenderDashboardPageBufferWithSlots(__gsx_buf *gsxbytes.Buffer, slots GSXDashboardPageSlots, data DashboardData) error {
+	__gsx_buf.Grow(853 + len(data.Metrics)*119)
+	return renderDashboardPage(__gsx_buf, slots, data)
 }
 
 func renderDashboardPage(w gsxio.Writer, __gsx_slots GSXDashboardPageSlots, data DashboardData) error {
@@ -108,7 +139,6 @@ func renderDashboardPage(w gsxio.Writer, __gsx_slots GSXDashboardPageSlots, data
 		}
 		for _, metric := range data.Metrics {
 			{
-				metric := metric
 				if err := gsxrt.WriteString(w, "<article class=\"metric-card\"><h2>"); err != nil {
 					return err
 				}

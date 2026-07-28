@@ -35,7 +35,7 @@ go install github.com/jlcsoftgenie/gsx/cmd/gsx@latest
 This repository contains a complete, working implementation with:
 - compiler/parser/code generator
 - small runtime package
-- CLI: `generate`, `build`, `check`, `lint`, `fmt`, `watch`, `init`, `version`
+- CLI: `generate`, `build`, `check`, `lint`, `fmt`, `watch`, `doctor`, `init`, `version`
 - formatter and linter
 - VS Code extension with syntax highlighting, snippets, hover, formatting, diagnostics, and language-server completions
 - layouts and named slots
@@ -91,7 +91,9 @@ Generated public API:
 
 ```go
 func RenderHomePage(w io.Writer, title string, users []User) error
+func RenderHomePageBuffer(buf *bytes.Buffer, title string, users []User) error
 func RenderHomePageWithSlots(w io.Writer, slots GSXHomePageSlots, title string, users []User) error
+func RenderHomePageBufferWithSlots(buf *bytes.Buffer, slots GSXHomePageSlots, title string, users []User) error
 ```
 
 ## Why GSX Exists
@@ -166,6 +168,7 @@ Build and generate:
 gsx generate .
 gsx build .
 gsx check .
+gsx doctor .
 gsx watch --build .
 gsx init --module example.com/myapp ./myapp
 ```
@@ -173,6 +176,7 @@ gsx init --module example.com/myapp ./myapp
 Notes:
 - `generate` stores package fingerprints in `.gsx/cache.json` and skips unchanged packages
 - `watch` uses `fsnotify` with debouncing instead of polling
+- `doctor` verifies the Go version, reports the optional `gopls` integration, and detects stale generated files
 
 Formatting and linting:
 
@@ -204,13 +208,15 @@ Measured with `go test -bench=. -benchmem ./benchmarks` on Linux amd64, Intel(R)
 
 | Benchmark | ns/op | B/op | allocs/op |
 | --- | ---: | ---: | ---: |
-| `BenchmarkGSXSimple` | 143.9 | 496 | 4 |
-| `BenchmarkHTMLTemplateSimple` | 834.7 | 864 | 17 |
-| `BenchmarkGomponentsSimple` | 744.2 | 1288 | 30 |
-| `BenchmarkGSXList` | 10742 | 32752 | 10 |
-| `BenchmarkGSXNestedLayouts` | 11224 | 32752 | 10 |
-| `BenchmarkHTMLTemplateList` | 147580 | 84475 | 2424 |
-| `BenchmarkGomponentsList` | 67384 | 112200 | 2437 |
+| `BenchmarkGSXSimple` | 217.4 | 496 | 4 |
+| `BenchmarkGSXSimpleBuffer` | 153.8 | 272 | 2 |
+| `BenchmarkHTMLTemplateSimple` | 1164 | 864 | 17 |
+| `BenchmarkGomponentsSimple` | 1047 | 1288 | 30 |
+| `BenchmarkGSXList` | 15455 | 32752 | 10 |
+| `BenchmarkGSXListBuffer` | 11578 | 24624 | 2 |
+| `BenchmarkGSXNestedLayouts` | 15518 | 32752 | 10 |
+| `BenchmarkHTMLTemplateList` | 202122 | 84474 | 2424 |
+| `BenchmarkGomponentsList` | 93879 | 112200 | 2437 |
 
 See [docs/performance.md](docs/performance.md).
 
@@ -235,6 +241,7 @@ Generated files:
 - live next to the `.gsx` source file
 - are named `*.gsx.go`
 - expose `Render<Component>` wrappers
+- expose `Render<Component>Buffer` wrappers for in-memory output with generated size hints
 - expose `Render<Component>WithSlots` and `GSX<Component>Slots` for advanced composition
 - keep a small internal render signature for local component calls
 
@@ -242,6 +249,7 @@ Example:
 
 ```go
 func RenderUsersPage(w io.Writer, title string, users []User) error
+func RenderUsersPageBuffer(buf *bytes.Buffer, title string, users []User) error
 func RenderUsersPageWithSlots(w io.Writer, slots GSXUsersPageSlots, title string, users []User) error
 ```
 
