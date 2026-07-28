@@ -45,7 +45,7 @@
       "patterns": [
         {
           "name": "meta.package.gsx",
-          "match": "\\b(package)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "match": "^\\s*(package)\\s+([A-Za-z_][A-Za-z0-9_]*)",
           "captures": {
             "1": { "name": "keyword.control.gsx" },
             "2": { "name": "entity.name.namespace.gsx" }
@@ -53,7 +53,7 @@
         },
         {
           "name": "meta.import.gsx",
-          "match": "\\b(import)\\b",
+          "match": "^\\s*(import)\\b",
           "captures": {
             "1": { "name": "keyword.control.gsx" }
           }
@@ -64,7 +64,7 @@
       "patterns": [
         {
           "name": "meta.component.signature.gsx",
-          "begin": "\\b(component)\\s+([A-Z][A-Za-z0-9_]*)\\s*(\\()",
+          "begin": "^\\s*(component)\\s+([A-Z][A-Za-z0-9_]*)\\s*(\\()",
           "beginCaptures": {
             "1": { "name": "keyword.control.gsx" },
             "2": { "name": "entity.name.function.gsx" },
@@ -85,7 +85,7 @@
       "patterns": [
         {
           "name": "meta.control.elseif.gsx",
-          "begin": "\\b(else)\\s+(if)\\b",
+          "begin": "^\\s*(else)\\s+(if)\\b",
           "beginCaptures": {
             "1": { "name": "keyword.control.gsx" },
             "2": { "name": "keyword.control.gsx" }
@@ -100,7 +100,7 @@
         },
         {
           "name": "meta.control.flow.gsx",
-          "begin": "\\b(if|for)\\b",
+          "begin": "^\\s*(if|for)\\b",
           "beginCaptures": {
             "1": { "name": "keyword.control.gsx" }
           },
@@ -114,7 +114,7 @@
         },
         {
           "name": "meta.control.else.gsx",
-          "match": "\\b(else)\\b(\\s*)(\\{)",
+          "match": "^\\s*(else)\\b(\\s*)(\\{)",
           "captures": {
             "1": { "name": "keyword.control.gsx" },
             "3": { "name": "punctuation.section.block.begin.gsx" }

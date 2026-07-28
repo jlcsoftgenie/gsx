@@ -2,7 +2,7 @@
   "name": "gsx-language-tools",
   "displayName": "GSX Language Tools",
   "description": "Syntax highlighting, snippets, hover, formatting, diagnostics, and language-server completions for GSX templates.",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "publisher": "jlcsoftgenie",
   "license": "MIT",
   "repository": {
@@ -123,6 +123,8 @@
     "@types/node": "^24.0.0",
     "@types/vscode": "^1.90.0",
     "esbuild": "^0.28.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vscode-oniguruma": "^2.0.1",
+    "vscode-textmate": "^9.3.2"
   }
 }
